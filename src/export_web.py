@@ -59,6 +59,7 @@ def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
             "gap_code": "G-NO-PRICE" if e.get("cost_usd") is None else None,
             "ingest_channel": e.get("ingest_channel"),
             "billing_identity": e.get("billing_identity"),
+            "service_tier": e.get("service_tier"),
         }
         events_out.append(row)
         by_session[e["session_id"]].append(row)

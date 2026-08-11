@@ -42,8 +42,8 @@
 | I10 | D7 | P1 | More fixtures | S | **DONE** |
 | I12 | D1 | P2 | Subagent rollup | M | PENDING |
 | I13 | D1 | P2 | config.toml default model | S | **DONE** |
-| I14 | D4 | P2 | service_tier capture | S | PENDING |
-| I15 | D5 | P2 | Filtered CSV export | S | **DONE** (this PR) |
+| I14 | D4 | P2 | service_tier capture | S | **DONE** (this PR) |
+| I15 | D5 | P2 | Filtered CSV export | S | **DONE** |
 
 ## Approval log
 
@@ -51,5 +51,4 @@
 |------|----------|-----|-------|
 | 2026-08-11 | SEEDED | D1–D8, I\* | Initial |
 | 2026-08-11 | NEW DIRECTION | D9, IU0–IU8 | Multi-provider plane |
-| 2026-08-11 | MERGED | I10 I1 I3 I4 I5 I13 | Web BUILD batch (partial) |
-
+| 2026-08-11 | MERGED | I10–I5 I13 I15 I14 | Web BUILD full batch |
