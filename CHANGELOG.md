@@ -17,6 +17,7 @@ project follows [Semantic Versioning](https://semver.org/).
 - Provider packs: **Codex**, **Perplexity** (seat+CSV), **Gemini** (seat+CSV)
 - **Two tracks:** `master` (universal) vs `personal` — [docs/TRACKS.md](docs/TRACKS.md)
 - Community contribution path: [docs/PROVIDERS.md](docs/PROVIDERS.md), provider issue/PR templates
+- **`funny-export`**: comic anonymizer for shareable fixture packs ([docs/OBFUSCATE.md](docs/OBFUSCATE.md))
 
 ### Planned (by wave)
 - **U1** Grok (often personal-first, then promote to master)

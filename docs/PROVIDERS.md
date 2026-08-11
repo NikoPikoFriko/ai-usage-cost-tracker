@@ -21,6 +21,7 @@ Minimal set:
 3. **No secrets** in the PR.  
 4. **No full prompts** in fixtures.  
 5. **Local-first** — default path is offline files / user-supplied CSV.  
+6. **Fixtures from real data?** Run `python -m src.cli funny-export` first ([OBFUSCATE.md](OBFUSCATE.md)), then skim for usernames.  
 
 ## Suggested PR title format
 

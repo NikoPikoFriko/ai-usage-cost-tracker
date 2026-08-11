@@ -66,6 +66,17 @@ Provider docs: [Codex](docs/providers/CODEX.md) · [Perplexity](docs/providers/P
 
 Others can open a **provider pack PR** to `master` — see [docs/PROVIDERS.md](docs/PROVIDERS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
+### Funny public export (anonymizer)
+
+Same analytics shape — private names/paths become comic placeholders:
+
+```bash
+python -m src.cli funny-export --name demo_public --shift-days 60
+# → exports/funny/demo_public/{data.json,events.jsonl,README.md}
+```
+
+See [docs/OBFUSCATE.md](docs/OBFUSCATE.md).
+
 ### Two tracks (universal vs personal)
 
 | Track | Branch | For |

@@ -17,6 +17,11 @@ from src.adapters.registry import list_adapters, run_adapter
 from src.cost import load_pricing, price_event_fields
 from src.db import TrackerDB
 from src.export_web import write_web_data
+from src.obfuscate import (
+    load_payload_from_db,
+    load_payload_from_json,
+    write_funny_pack,
+)
 
 DB_PATH = ROOT / "data" / "tracker.db"
 PRICING = ROOT / "config" / "PRICING_MODELS.csv"
@@ -203,6 +208,39 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_funny_export(args: argparse.Namespace) -> int:
+    """
+    Real usage payload → public-safe funny pack (same schema, private fields comic).
+    """
+    if args.from_json:
+        payload = load_payload_from_json(Path(args.from_json))
+    elif args.from_db:
+        payload = load_payload_from_db(Path(args.from_db))
+    elif DB_PATH.exists():
+        payload = load_payload_from_db(DB_PATH)
+    elif WEB_DATA.exists():
+        payload = load_payload_from_json(WEB_DATA)
+    else:
+        print("No input: run ingest first, or pass --from-db / --from-json", file=sys.stderr)
+        return 1
+
+    salt = args.salt or "public-funny-pack"
+    out = Path(args.out) if args.out else (ROOT / "exports" / "funny")
+    paths = write_funny_pack(
+        payload,
+        out,
+        salt=salt,
+        shift_days=int(args.shift_days or 0),
+        name=args.name or "funny_pack",
+    )
+    print(f"funny pack: {paths['dir']}")
+    print(f"  data.json     → {paths['data_json']}")
+    print(f"  events.jsonl  → {paths['events_jsonl']}")
+    print(f"  README.md     → {paths['readme']}")
+    print("Remember: originals stay private; this pack is for sharing/tests only.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         prog="ai-usage-cost-tracker",
@@ -253,6 +291,27 @@ def main(argv: list[str] | None = None) -> int:
     srv.add_argument("--host", default="127.0.0.1")
     srv.add_argument("--port", type=int, default=8765)
     srv.set_defaults(func=cmd_serve)
+
+    fun = sub.add_parser(
+        "funny-export",
+        help="Anonymize usage data into a shareable comic fixture pack",
+    )
+    fun.add_argument("--from-db", default=None, help="Path to tracker.db (default: data/tracker.db)")
+    fun.add_argument("--from-json", default=None, help="Path to web/data.json-shaped file")
+    fun.add_argument("--out", default=None, help="Output parent dir (default: exports/funny)")
+    fun.add_argument("--name", default="funny_pack", help="Pack folder name")
+    fun.add_argument(
+        "--salt",
+        default=None,
+        help="Run salt for comic mapping (default fixed public salt; change per export if you like)",
+    )
+    fun.add_argument(
+        "--shift-days",
+        type=int,
+        default=0,
+        help="Shift all timestamps by N days (extra calendar scrub)",
+    )
+    fun.set_defaults(func=cmd_funny_export)
 
     args = p.parse_args(argv)
     return args.func(args)
