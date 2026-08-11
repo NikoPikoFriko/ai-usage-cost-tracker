@@ -62,3 +62,12 @@ How to run the fixture test.
 3. Merge only the universal pack — not someone’s personal paths.  
 
 Personal experiments stay on the **`personal`** branch until cleaned for `master` ([TRACKS.md](TRACKS.md)).
+
+### Codex `config.toml` model fallback (I13)
+
+When a rollout never exposes a model id, ingest may read **only** model-related keys
+(`model`, `default_model`, `model_slug`) from `$CODEX_HOME/config.toml`.
+
+- **Never** reads `auth.json` or other credential files.
+- Used only as `default_model` after JSONL model discovery fails for a turn/session.
+
