@@ -17,6 +17,9 @@ personal/channels.override.yaml
 personal/**/*.local.yaml
 personal/**/secrets*
 
+# Local funny exports (regenerate anytime; may still need human skim)
+exports/
+
 # Python
 __pycache__/
 *.py[cod]
