@@ -436,6 +436,65 @@
     document.getElementById("filter-summary").textContent = bits.join(" · ");
   }
 
+
+  function exportFilteredCsv() {
+    const events = filteredEvents();
+    const headers = [
+      "ts",
+      "channel",
+      "session_id",
+      "label",
+      "model",
+      "money_rail",
+      "grain",
+      "tokens_in",
+      "tokens_out",
+      "tokens_cached",
+      "cost_usd",
+      "grade",
+      "billing_identity",
+    ];
+    const esc = (v) => {
+      if (v == null) return "";
+      const s = String(v);
+      if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    };
+    const rows = [headers.join(",")];
+    events.forEach((e) => {
+      rows.push(
+        [
+          e.ts || e.ts_utc || "",
+          e.channel || "",
+          e.session_id || "",
+          e.label || "",
+          e.model || "",
+          e.money_rail || "",
+          e.grain || "",
+          e.tokens_in != null ? e.tokens_in : "",
+          e.tokens_out != null ? e.tokens_out : "",
+          e.tokens_cached != null ? e.tokens_cached : "",
+          e.cost_usd != null ? e.cost_usd : "",
+          e.grade || "",
+          e.billing_identity || "",
+        ]
+          .map(esc)
+          .join(",")
+      );
+    });
+    // Privacy: labels/tokens/$ only — never prompt bodies (not present in data.json).
+    const blob = new Blob([rows.join("\n") + "\n"], {
+      type: "text/csv;charset=utf-8",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ai-usage-filtered.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  }
+
   function bind() {
     document.querySelectorAll('input[name="period"]').forEach((r) => {
       r.addEventListener("change", () => {
@@ -462,6 +521,9 @@
     document.getElementById("filter-search").addEventListener("input", (e) => {
       state.q = e.target.value.trim();
       render();
+    });
+    document.getElementById("btn-export-csv").addEventListener("click", () => {
+      exportFilteredCsv();
     });
     document.getElementById("btn-clear-filters").addEventListener("click", () => {
       state.channel = "all";

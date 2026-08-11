@@ -38,12 +38,12 @@
 | I2 | D1 | P2 | Incremental ingest | M | PENDING |
 | I3 | D4 | P1 | Model alias resolve | S | **DONE** |
 | I4 | D5 | P1 | Real date filters | S | **DONE** |
-| I5 | D5 | P2 | Estimate banner | S | **DONE** (this PR) |
+| I5 | D5 | P2 | Estimate banner | S | **DONE** |
 | I10 | D7 | P1 | More fixtures | S | **DONE** |
 | I12 | D1 | P2 | Subagent rollup | M | PENDING |
 | I13 | D1 | P2 | config.toml default model | S | **DONE** |
 | I14 | D4 | P2 | service_tier capture | S | PENDING |
-| I15 | D5 | P2 | Filtered CSV export | S | PENDING |
+| I15 | D5 | P2 | Filtered CSV export | S | **DONE** (this PR) |
 
 ## Approval log
 
@@ -51,6 +51,5 @@
 |------|----------|-----|-------|
 | 2026-08-11 | SEEDED | D1–D8, I\* | Initial |
 | 2026-08-11 | NEW DIRECTION | D9, IU0–IU8 | Multi-provider plane |
-| 2026-08-11 | APPROVE IMPLEMENT | IU0–IU2 | Plan GO default batch |
-| 2026-08-11 | MERGED | I10 I1 I3 I4 I13 | Web BUILD batch |
-| 2026-08-11 | MERGED | I5 | dual-ledger banner |
+| 2026-08-11 | MERGED | I10 I1 I3 I4 I5 I13 | Web BUILD batch (partial) |
+
