@@ -110,6 +110,7 @@ python -m src.cli ingest codex-jsonl --codex-home /path/to/.codex
 - Session token totals sum **per-turn billed input** (context re-sent each turn). That can look large; it matches how API billing works.
 - Pricing CSV is a **snapshot** — update from [OpenAI pricing](https://developers.openai.com/api/docs/pricing) when models change.
 - Unknown models show as **GAP** until you add a row to `config/PRICING_MODELS.csv` and run `reprice`.
+- Model **aliases** live in `config/MODEL_ALIASES.csv` and resolve before the exact rate-card match (alias hits are **CAND**).
 
 ## Privacy
 

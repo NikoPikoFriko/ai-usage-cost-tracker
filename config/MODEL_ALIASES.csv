@@ -1,0 +1,5 @@
+alias,canonical_model_id,notes
+gpt-5.6-terra-2026,gpt-5.6-terra,Observed dated slug → terra rate card
+codex-auto,gpt-5.6-terra,Codex auto routing alias (CAND join)
+gpt-5-codex-latest,gpt-5-codex,Latest tag for codex responses API family
+gpt-4o-latest,gpt-4o,Floating latest alias

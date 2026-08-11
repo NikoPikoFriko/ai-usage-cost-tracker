@@ -36,6 +36,7 @@
 | IU8 | D9/U3 | P2 | Perplexity sub/invoice adapter | M | PENDING |
 | I1 | D1 | P1 | Codex model discovery | M | **IN PR / PENDING REVIEW** |
 | I2 | D1 | P2 | Incremental ingest | M | PENDING |
+| I3 | D4 | P1 | Model alias resolve | S | **IN PR / PENDING REVIEW** |
 | I4 | D5 | P1 | Real date filters | S | PENDING |
 | I5 | D5 | P2 | Estimate banner | S | PENDING |
 | I10 | D7 | P1 | More fixtures | S | **IN PR / PENDING REVIEW** |
