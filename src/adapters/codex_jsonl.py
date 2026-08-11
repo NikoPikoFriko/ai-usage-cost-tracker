@@ -229,6 +229,8 @@ def parse_rollout_file(
                 rl = pl.get("rate_limits") if isinstance(pl.get("rate_limits"), dict) else {}
                 plan = rl.get("plan_type")
                 billing = "chatgpt_credits" if plan else "unknown"
+                # Plan/credits burn is not a pure API invoice; label rail honestly.
+                money_rail = "credits" if plan else "api_metered"
 
                 grade = "OBS" if priced["priced"] else "GAP"
                 if priced["priced"] and priced.get("rate_evidence") == "CAND":
@@ -245,6 +247,8 @@ def parse_rollout_file(
                         session_id=session_id,
                         ts_utc=ts or started_at or "",
                         model=event_model,
+                        grain="turn",
+                        money_rail=money_rail,
                         input_tokens=inp,
                         output_tokens=out,
                         cached_input_tokens=cached,

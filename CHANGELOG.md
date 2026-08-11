@@ -8,14 +8,16 @@ project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- Developmental directions seed: `docs/DIRECTIONS.md` (D1–D8)
-- Review roster seed proposals I1–I12 in `REVIEW_ROSTER.md`
+- **D9 multi-provider spend plane** (NEW DIRECTION): open `source_product`, `grain`, `money_rail`
+- Docs: `docs/SCHEMA.md`, `docs/ADAPTER_PROTOCOL.md`, updated `docs/DIRECTIONS.md`
+- UI: dynamic provider filters + **by_rail** / metered_only / all_labeled rollup
+- Export totals: `cost_by_rail`, `cost_by_product`, `cost_usd_metered_only`
+- Codex rows tagged `grain=turn`, `money_rail=credits|api_metered`
 
 ### Planned (by wave)
-- **v0.1.x** — Codex hardening + pricing aliases (D1, D4, D7)
-- **v0.2** — Honest ChatGPT lane + UX banners (D2, D5)
-- **v0.3** — Opt-in Usage/Costs API reconcile (D3)
-- **v0.4** — PyPI packaging (D6)
+- **U1** Grok local sessions adapter
+- **U2** Claude · **U3** Perplexity · ChatGPT subscription ledger
+- Adapter registry CLI · PyPI packaging
 
 ## [0.1.0] — 2026-08-11
 

@@ -1,103 +1,110 @@
-# Developmental directions (seeded)
+# Developmental directions
 
-**Status:** Principal-seeded · open for Web BUILD refinement  
-**Product:** AI Usage Cost Tracker · Path A open source · local-first  
-**As of:** v0.1.0 / 2026-08-11  
-**Not a commitment:** directions guide review & PRs; each ship still needs APPROVE.
+**Status:** Principal NEW DIRECTION — multi-provider spend plane (2026-08-11)  
+**Product:** Personal AI spend observatory · local-first · open source  
+**Not a commitment:** each ship still needs `APPROVE` / `APPROVE IMPLEMENT`
 
 ---
 
 ## North star
 
-A **personal, offline-first** ledger that answers:
+> Make **agent spend observable across the whole AI stack**—at the resolution each platform actually exposes.
 
-> “What did this **session** / **turn** cost me in tokens and dollars?”
+Not “track OpenAI better.” A personal, offline-first ledger that answers:
 
-…for **Codex first**, then honest ChatGPT surfaces, without lying about Plus vs API billing.
+> “Where did my AI money go this week—**by agent**, by session, by model?”
+
+…for **Codex, Grok, Claude, Perplexity, ChatGPT**, and others—without collapsing them into a fake single invoice or a cloud FinOps product on day one.
 
 ---
 
-## Non-negotiables (laws)
+## Architectural axes (orthogonal)
+
+| Axis | Meaning |
+|------|---------|
+| **Provider adapter** | How usage enters (local logs, export, Usage API, invoice, manual CSV) |
+| **Grain** | turn / request / session / day / subscription_period / bucket — **declared, never faked** |
+| **Money rail** | `api_metered` · `subscription` · `credits` · `shadow_estimate` · `invoice_line` |
+| **Identity** | One human operator, many products (not multi-tenant SaaS by default) |
+| **Trust** | Every row: `source_product`, `ingest_channel`, `evidence_class`, `billing_identity`, `grain`, `money_rail` |
+
+**Law (N-way ledger):** never sum apples and oranges into one “total AI spend” without an **explicit rollup mode** (`by_rail` default, `metered_only`, or `all_labeled`).
+
+See [SCHEMA.md](SCHEMA.md) and [ADAPTER_PROTOCOL.md](ADAPTER_PROTOCOL.md).
+
+---
+
+## Non-negotiables
 
 | Law | Meaning |
 |-----|---------|
 | Local-first | Default path never uploads usage to a third party |
-| Dual ledger | Rate-card / API-equivalent $ ≠ ChatGPT seat invoice |
+| N-way ledger honesty | Rate-card ≠ subscription ≠ invoice without labels |
 | Privacy | No full prompts by default; never ingest `auth.json` |
 | Honest gaps | Unpriced / unknown → GAP, never fake $0 |
-| Small ships | Prefer vertical slices over platform rewrites |
-| Scope fence v1 | ChatGPT + Codex only (other vendors later, explicit expand) |
+| Small ships | One adapter / vertical slice per PR when possible |
+| Extensibility | New agent = adapter + fence row, not a fork |
 
 ---
 
-## Direction tracks (D1–D8)
+## Non-goals (until further NEW DIRECTION)
 
-### D1 — Codex MAXres excellence (core)
-**Why:** Station / most power users already have local turn tokens.  
-**Outcomes:**
-- Robust `token_count` parse across Codex versions  
-- Better model discovery (fewer `unknown`)  
-- Session titles, parent/subagent rollups without double-count traps  
-- Fast re-ingest + optional “since last run”  
-**Done looks like:** Re-install on a clean machine → ingest → dashboard useful in &lt;5 minutes.
+- Hosted multi-user SaaS of everyone’s chats  
+- Cookie-scraping private web UIs as primary ingest  
+- One unlabeled “true spend” across all vendors  
+- Enterprise FinOps before personal multi-agent clarity works offline  
+
+---
+
+## Direction tracks
+
+### D1 — Codex MAXres excellence
+Local turn tokens remain the gold path. Harden parse, models, incremental ingest, subagent rollups.
 
 ### D2 — Honest ChatGPT lane
-**Why:** Users say “ChatGPT” but Plus has no official per-prompt token invoice.  
-**Outcomes:**
-- Subscription amortization row (seat $ / day)  
-- Optional data-export + tokenizer **shadow** cost (HYP)  
-- UI modes: “API-equivalent” vs “cash out the door”  
-**Done looks like:** No one confuses Plus chat with API line items.
+Seat amortization (`subscription`) + optional shadow tokens (`shadow_estimate`). Never fake Plus as API.
 
 ### D3 — API / org reconciliation (opt-in)
-**Why:** When traffic is API-key metered, Usage/Costs APIs are $ truth at coarser grain.  
-**Outcomes:**
-- Opt-in Admin key from env only  
-- Bucketed events labeled **not** per-prompt  
-- Reconciliation view: local sum vs org costs (no silent double-count)  
-**Done looks like:** Power users can cross-check the bill without losing MAXres Codex view.
+Usage/Costs APIs as `bucket` grain + `api_metered` or `invoice_line`. Cross-check only; no silent double-count.
 
 ### D4 — Pricing fidelity
-**Why:** Models and tiers change; snapshot CSV drifts.  
-**Outcomes:**
-- Alias map (`codex-auto-review` → base rates)  
-- Fast / Batch / long-context bands when usage exposes them  
-- Documented refresh process from official pricing pages  
-**Done looks like:** &lt;5% of turns unpriced for current Codex models.
+Aliases, Fast/long-context tiers, multi-family rate cards, refresh from official docs.
 
 ### D5 — MAXres UX polish
-**Why:** Tired principal needs 10-second path.  
-**Outcomes:**
-- Real date ranges (Today / 7d / 30d on live data)  
-- Export CSV of filtered events  
-- Clear banners: estimate vs invoice; plan rail vs API rail  
-- LOW RES already seeded — keep improving  
-**Done looks like:** Expensive session is obvious without reading docs.
+Date filters, export CSV, estimate vs cash banners, **provider filter**, **by_rail totals**.
 
-### D6 — Packaging & install (coder → everyone)
-**Why:** Clone+venv is fine for v0.1; broader adoption needs friction cut.  
-**Outcomes:**
-- `pip install ai-usage-cost-tracker` (PyPI)  
-- Console entrypoint `ai-usage-cost`  
-- One-page install for Windows / macOS / Linux  
-**Done looks like:** Non-git users can still run it.
+### D6 — Packaging & install
+PyPI, entrypoint `ai-usage-cost`, low-friction install.
 
 ### D7 — Quality & trust (OSS)
-**Why:** Public repo must stay safe and green.  
+CI, fixtures, safe contrib path, no live usage in git.
+
+### D8 — Explicit historical non-goals
+Still: no SaaS / cookie primary / unlabeled mega-total. Multi-vendor is now **in** via D9—not a free-for-all rewrite.
+
+### D9 — Multi-provider personal spend plane (**axis**)
+**Why:** Real money burns on Grok, Claude, Perplexity, etc., off the board.  
 **Outcomes:**
-- CI green on every PR  
-- More fixtures (edge JSONL shapes)  
-- SECURITY process tested; no real usage in git  
-- CONTRIBUTING clarity for adapters  
-**Done looks like:** Strangers can PR adapters without footguns.
+- Open `source_product` set  
+- Declared `grain` + `money_rail` on every row  
+- Adapter registry protocol  
+- UI filter by provider; totals by rail  
+- Waves U1 Grok → U2 Claude → U3 Perplexity → U4 community packs  
 
-### D8 — Explicit non-goals (until a NEW direction)
-- Multi-tenant SaaS / hosted “everyone’s data on our server”  
-- Auto-scraping ChatGPT web with session cookies  
-- Full FinOps for Claude / Gemini / Grok / Cursor in the same v1 fence  
-- Tax/accounting certification  
+**Done looks like:** Adding a provider is docs + adapter + map, not a fork; weekly “where did money go” works offline.
 
-Expand only with Principal `NEW DIRECTION` + finish contract.
+---
+
+## Provider waves
+
+| Phase | Surfaces | Resolution target |
+|-------|----------|-------------------|
+| v0.1 | Codex local | Turn MAXres |
+| Next | ChatGPT honest | Seat + optional shadow |
+| **U1** | Grok local sessions / cost ticks | Turn or session |
+| **U2** | Claude / Anthropic | API or export |
+| **U3** | Perplexity | Subscription + export if any |
+| **U4** | Adapter registry packs | Community |
 
 ---
 
@@ -105,19 +112,17 @@ Expand only with Principal `NEW DIRECTION` + finish contract.
 
 | Wave | Theme | Tracks |
 |------|--------|--------|
-| **v0.1.x** | Hardening Codex + docs | D1, D4, D7 |
-| **v0.2** | ChatGPT honest lane | D2, D5 |
-| **v0.3** | Opt-in Usage API reconcile | D3 |
-| **v0.4** | PyPI + polish | D6, D5 |
-| **v1.0** | Stable CLI + dual ledger UX + trusted rates | D1–D7 enough for “boring reliable” |
+| v0.1.x | Schema rails + Codex tagged + UI by_rail | D9, D1, D5 |
+| v0.2 | Grok U1 + ChatGPT seat | D9, U1, D2 |
+| v0.3 | Claude + opt-in Usage API | U2, D3 |
+| v0.4 | Perplexity + PyPI | U3, D6 |
+| v1.0 | Stable multi-agent observatory | D1–D9 enough for “boring reliable” |
 
 ---
 
-## How Web BUILD should use this
+## How Web BUILD / implementers use this
 
-1. Read this file + `REVIEW_ROSTER.md` + product laws.  
-2. Propose **implementation items** `I1…In` that **map to a track** (`maps_to: D2`).  
-3. Do **not** invent a SaaS pivot or vendor merge without Principal direction.  
-4. Prefer P1 items that unlock the next wave over random polish.
-
-Human still: `APPROVE` / `REJECT` / `DEFER` / `APPROVE IMPLEMENT`.
+1. Map every **I\*** / **IU\*** to a D-track (prefer D9 for plane work).  
+2. Do not invent SaaS or cookie-scrape primary.  
+3. Prefer serial adapters over multi-vendor mega-PRs.  
+4. Human: `APPROVE` / `REJECT` / `DEFER` / `APPROVE IMPLEMENT`.

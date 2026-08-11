@@ -90,6 +90,12 @@ tr.is-selected td { background:rgba(110,203,255,.12); }
 }
 .badge-chatgpt { background:rgba(61,187,255,.15); color:#9fe8ff; }
 .badge-codex { background:rgba(176,107,255,.15); color:#e0c4ff; }
+.badge-grok { background:rgba(61,214,140,.15); color:#9dffc8; }
+.badge-claude { background:rgba(240,180,41,.15); color:#ffd78a; }
+.badge-perplexity { background:rgba(61,187,255,.12); color:#b8e0ff; }
+.badge-unknown { background:rgba(143,160,184,.15); color:#c5d0e0; }
+#rail-strip .stat { min-width:5.5rem; }
+#rail-strip .stat span { text-transform:none; letter-spacing:0; font-size:.7rem; }
 .grade-OBS { color:var(--ok); }
 .grade-CAND { color:var(--accent); }
 .grade-HYP { color:var(--warn); }

@@ -72,12 +72,36 @@ def cmd_reprice(_: argparse.Namespace) -> int:
     db = TrackerDB(DB_PATH)
 
     def price_fn(row: dict) -> dict:
+        rail = row.get("money_rail") or "unknown"
+        # subscription / invoice lines keep adapter cost unless null
+        if rail in ("subscription", "invoice_line") and row.get("cost_usd") is not None:
+            return {
+                "event_id": row["event_id"],
+                "unit_price_in_per_1m": row.get("unit_price_in_per_1m"),
+                "unit_price_out_per_1m": row.get("unit_price_out_per_1m"),
+                "unit_price_cached_in_per_1m": row.get("unit_price_cached_in_per_1m"),
+                "cost_usd": row.get("cost_usd"),
+                "pricing_as_of": row.get("pricing_as_of"),
+                "evidence_class": row.get("evidence_class") or "OBS",
+            }
+        tin = row.get("input_tokens")
+        tout = row.get("output_tokens")
+        if tin is None and tout is None:
+            return {
+                "event_id": row["event_id"],
+                "unit_price_in_per_1m": None,
+                "unit_price_out_per_1m": None,
+                "unit_price_cached_in_per_1m": None,
+                "cost_usd": None,
+                "pricing_as_of": None,
+                "evidence_class": "GAP",
+            }
         p = price_event_fields(
             rates,
             model=row["model"],
             ts_utc=row["ts_utc"],
-            input_tokens=row["input_tokens"] or 0,
-            output_tokens=row["output_tokens"] or 0,
+            input_tokens=int(tin or 0),
+            output_tokens=int(tout or 0),
             cached_input_tokens=row.get("cached_input_tokens"),
             cache_write_input_tokens=row.get("cache_write_input_tokens"),
         )

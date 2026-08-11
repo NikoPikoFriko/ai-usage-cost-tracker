@@ -16,18 +16,20 @@
     <div id="load-error" class="error-banner" hidden></div>
 
     <div class="totals-strip" id="totals-strip" role="region" aria-label="Period totals">
-      <div class="stat stat-primary" id="stat-cost"><b>$0</b><span>Cost</span></div>
+      <div class="stat stat-primary" id="stat-cost"><b>$0</b><span>Visible $</span></div>
       <div class="stat" id="stat-tokens"><b>0</b><span>Tokens</span></div>
       <div class="stat" id="stat-split"><b>—</b><span>In / Out</span></div>
       <div class="stat" id="stat-sessions"><b>0</b><span>Sessions</span></div>
       <div class="stat" id="stat-events"><b>0</b><span>Events</span></div>
       <div class="stat stat-gap" id="stat-gap"><b>0%</b><span>Unpriced</span></div>
     </div>
+    <div class="totals-strip" id="rail-strip" aria-label="By money rail"></div>
 
     <div class="filter-bar" id="filter-bar" role="toolbar" aria-label="Filters">
-      <label class="chip"><input type="radio" name="ch" value="all" checked/> All</label>
-      <label class="chip"><input type="radio" name="ch" value="chatgpt"/> ChatGPT</label>
-      <label class="chip"><input type="radio" name="ch" value="codex"/> Codex</label>
+      <span class="muted" id="provider-chips"></span>
+      <label class="chip"><input type="radio" name="rollup" value="by_rail" checked/> by rail</label>
+      <label class="chip"><input type="radio" name="rollup" value="metered_only"/> metered only</label>
+      <label class="chip"><input type="radio" name="rollup" value="all_labeled"/> all labeled</label>
       <label class="chip"><input type="checkbox" id="gap-only"/> GAP only</label>
       <label class="chip"><input type="checkbox" id="unpriced-only"/> Unpriced</label>
       <input type="search" id="filter-search" placeholder="Session / label / model…"/>
@@ -35,6 +37,7 @@
       <label class="chip"><input type="checkbox" id="toggle-low-res"/> LOW RES</label>
     </div>
     <p class="filter-summary" id="filter-summary"></p>
+    <p class="sync-line" id="ledger-note">N-way ledger: rails are not one invoice unless mode is all_labeled.</p>
   </div>
 </header>
 

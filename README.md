@@ -1,12 +1,15 @@
 # AI Usage Cost Tracker
 
-**Local-first** cost ledger for **OpenAI Codex** (and planned ChatGPT surfaces): tokens → USD at **turn / session** resolution.
+**Local-first personal AI spend observatory** — tokens and/or billed money across the agents you actually pay for (**Codex**, **Grok**, **Claude**, **Perplexity**, **ChatGPT**, …), at the resolution each platform exposes.
 
 ```text
-your machine  →  ingest Codex JSONL  →  SQLite  →  price with rate card  →  MAXres web UI
+adapters (per provider)  →  shared usage_event  →  SQLite  →  MAXres UI
+     grain + money_rail declared     N-way ledger (no fake single invoice)
 ```
 
 No cloud account required. Your usage data stays on disk.
+
+**Axis:** multi-provider plane ([docs/DIRECTIONS.md](docs/DIRECTIONS.md) D9) — not “OpenAI-only polish.”
 
 [![CI](https://github.com/NikoPikoFriko/ai-usage-cost-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/NikoPikoFriko/ai-usage-cost-tracker/actions/workflows/ci.yml)
 

@@ -93,6 +93,9 @@ def test_parse_fixture_events():
     assert events[0].cached_input_tokens == 200
     assert events[0].model == "gpt-5.6-terra"
     assert events[0].cost_usd is not None and events[0].cost_usd > 0
+    assert events[0].grain == "turn"
+    assert events[0].money_rail in ("credits", "api_metered")
+
     # idempotent ids stable
     events2, _ = parse_rollout_file(FIXTURE, rates)
     assert events[0].event_id == events2[0].event_id
