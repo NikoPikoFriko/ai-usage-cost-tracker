@@ -1,0 +1,39 @@
+model_id,product_family,input_usd_per_1m,output_usd_per_1m,cached_input_usd_per_1m,effective_from,source_url,evidence_class,notes
+gpt-4o,chatgpt_api,2.50,10.00,1.25,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Standard short-context; Fast tier higher
+gpt-4o-2024-05-13,chatgpt_api,5.00,15.00,,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Legacy snapshot; no cached rate listed
+gpt-4o-mini,chatgpt_api,0.15,0.60,0.075,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Standard
+gpt-4.1,chatgpt_api,2.00,8.00,0.50,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Standard
+gpt-4.1-mini,chatgpt_api,0.40,1.60,0.10,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Standard
+gpt-4.1-nano,chatgpt_api,0.10,0.40,0.025,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Standard
+gpt-5,chatgpt_api,1.25,10.00,0.125,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Reasoning billed as output
+gpt-5-mini,chatgpt_api,0.25,2.00,0.025,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,
+gpt-5-nano,chatgpt_api,0.05,0.40,0.005,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,
+gpt-5-pro,chatgpt_api,15.00,120.00,,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,No cached input listed
+gpt-5.1,chatgpt_api,1.25,10.00,0.125,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,
+gpt-5.2,chatgpt_api,1.75,14.00,0.175,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,
+gpt-5.2-pro,chatgpt_api,21.00,168.00,,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,No cached input listed
+gpt-5.4,chatgpt_api,2.50,15.00,0.25,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Short-context <272K; long-context higher
+gpt-5.4-mini,chatgpt_api,0.75,4.50,0.075,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,
+gpt-5.4-nano,chatgpt_api,0.20,1.25,0.02,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,
+gpt-5.4-pro,chatgpt_api,30.00,180.00,,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Short-context; long-context higher; no cache
+gpt-5.5,chatgpt_api,5.00,30.00,0.50,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Short-context <272K
+gpt-5.5-pro,chatgpt_api,30.00,180.00,,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Short-context; no cache
+gpt-5.6-sol,chatgpt_api,5.00,30.00,0.50,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Also cache_writes priced; long-context band
+gpt-5.6-terra,chatgpt_api,2.00,12.00,0.20,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Station Codex default observed in config; cache_writes priced
+gpt-5.6-luna,chatgpt_api,0.20,1.20,0.02,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,cache_writes priced
+o1,chatgpt_api,15.00,60.00,7.50,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Reasoning billed as output
+o1-pro,chatgpt_api,150.00,600.00,,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,No cached input listed
+o3,chatgpt_api,2.00,8.00,0.50,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Reasoning billed as output
+o3-pro,chatgpt_api,20.00,80.00,,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,No cached input listed
+o3-mini,chatgpt_api,1.10,4.40,0.55,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,
+o4-mini,chatgpt_api,1.10,4.40,0.275,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,
+gpt-5-codex,codex,1.25,10.00,0.125,2026-08-10,https://developers.openai.com/api/docs/models/gpt-5-codex,OBS,Responses API only
+gpt-5.1-codex,codex,1.25,10.00,0.125,2026-08-10,https://developers.openai.com/api/docs/models/gpt-5.2-codex,CAND,Listed in comparison table
+gpt-5.2-codex,codex,1.75,14.00,0.175,2026-08-10,https://developers.openai.com/api/docs/models/gpt-5.2-codex,OBS,
+gpt-5.3-codex,codex,1.75,14.00,0.175,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Fast mode ~2x separate tier
+codex-mini-latest,codex,1.50,6.00,0.375,2026-08-10,https://developers.openai.com/api/docs/models/codex-mini-latest,OBS,Fine-tuned o4-mini variant
+chat-latest,chatgpt_api,5.00,30.00,0.50,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,Specialized ChatGPT API category
+gpt-5.2-chat-latest,chatgpt_api,1.75,14.00,0.175,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,
+gpt-5.3-chat-latest,chatgpt_api,1.75,14.00,0.175,2026-08-10,https://developers.openai.com/api/docs/pricing,OBS,
+codex-auto-review,codex,1.25,10.00,0.125,2026-08-10,https://developers.openai.com/api/docs/pricing,CAND,Alias — priced like gpt-5-codex until official row found
+

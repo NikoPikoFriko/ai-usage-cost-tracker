@@ -1,0 +1,9 @@
+# Ingest channel registry (ids match ops CHANNELS.csv)
+codex_jsonl:
+  channel_id: codex_local_session_jsonl
+  product: codex
+  # Override with env CODEX_HOME
+  default_home_windows: "%USERPROFILE%\\.codex"
+  session_globs:
+    - sessions/**/rollout-*.jsonl
+    - archived_sessions/**/*.jsonl

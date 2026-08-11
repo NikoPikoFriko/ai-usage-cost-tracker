@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>AI Usage Cost — MAXres</title>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body class="page-ai-cost">
+<div class="rainbow-stripe" aria-hidden="true"></div>
+<header class="top">
+  <div class="top-pad">
+    <h1>AI Usage Cost <span id="data-badge" class="mock-badge">…</span></h1>
+    <p class="sub">ChatGPT + Codex · tokens per prompt / session · FC-2026-08-10-AI-USAGE-COST</p>
+    <p class="sync-line" id="sync-line">Loading…</p>
+    <div id="load-error" class="error-banner" hidden></div>
+
+    <div class="totals-strip" id="totals-strip" role="region" aria-label="Period totals">
+      <div class="stat stat-primary" id="stat-cost"><b>$0</b><span>Cost</span></div>
+      <div class="stat" id="stat-tokens"><b>0</b><span>Tokens</span></div>
+      <div class="stat" id="stat-split"><b>—</b><span>In / Out</span></div>
+      <div class="stat" id="stat-sessions"><b>0</b><span>Sessions</span></div>
+      <div class="stat" id="stat-events"><b>0</b><span>Events</span></div>
+      <div class="stat stat-gap" id="stat-gap"><b>0%</b><span>Unpriced</span></div>
+    </div>
+
+    <div class="filter-bar" id="filter-bar" role="toolbar" aria-label="Filters">
+      <label class="chip"><input type="radio" name="ch" value="all" checked/> All</label>
+      <label class="chip"><input type="radio" name="ch" value="chatgpt"/> ChatGPT</label>
+      <label class="chip"><input type="radio" name="ch" value="codex"/> Codex</label>
+      <label class="chip"><input type="checkbox" id="gap-only"/> GAP only</label>
+      <label class="chip"><input type="checkbox" id="unpriced-only"/> Unpriced</label>
+      <input type="search" id="filter-search" placeholder="Session / label / model…"/>
+      <button type="button" id="btn-clear-filters">Clear</button>
+      <label class="chip"><input type="checkbox" id="toggle-low-res"/> LOW RES</label>
+    </div>
+    <p class="filter-summary" id="filter-summary"></p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="panel" id="panel-sessions">
+    <header class="ph">
+      <h2>Sessions</h2>
+      <span class="tag">rollup</span>
+      <span class="muted" id="session-count"></span>
+    </header>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ch</th>
+            <th>Session</th>
+            <th class="hi-only">Start</th>
+            <th>#</th>
+            <th>Tok</th>
+            <th>$</th>
+            <th>Src</th>
+            <th class="hi-only">Models</th>
+            <th class="hi-only">Cov</th>
+          </tr>
+        </thead>
+        <tbody id="session-tbody"></tbody>
+      </table>
+    </div>
+    <p class="empty-state" id="session-empty" hidden>No sessions. Run ingest.</p>
+    <p class="pin-banner" id="session-pin-banner" hidden>
+      Pinned: <span id="pin-label"></span>
+      <button type="button" id="btn-clear-pin">Show all events</button>
+    </p>
+  </section>
+
+  <section class="panel" id="panel-events">
+    <header class="ph">
+      <h2>Prompts / events</h2>
+      <span class="tag">maxres</span>
+      <span class="muted" id="event-scope"></span>
+    </header>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Ch</th>
+            <th class="unpin-only">Session</th>
+            <th>Turn</th>
+            <th class="hi-only">Role</th>
+            <th>Model</th>
+            <th>In</th>
+            <th>Out</th>
+            <th class="hi-only">Cache</th>
+            <th>$</th>
+            <th>Src</th>
+          </tr>
+        </thead>
+        <tbody id="event-tbody"></tbody>
+      </table>
+    </div>
+    <p class="empty-state" id="event-empty" hidden>0 events match.</p>
+  </section>
+
+  <section class="panel" id="panel-gaps">
+    <header class="ph">
+      <h2>Gaps</h2>
+      <span class="tag">honesty</span>
+      <span id="gap-count" class="muted"></span>
+    </header>
+    <div class="coverage-bar" id="coverage-bar"><i style="width:0%"></i></div>
+    <ul id="gap-list"></ul>
+    <p class="serial-action" id="gap-serial-action"></p>
+    <p class="empty-ok ok" id="gaps-ok" hidden>Coverage OK — all visible events priced.</p>
+  </section>
+</main>
+
+<footer>
+  Contract FC-2026-08-10-AI-USAGE-COST · local-first · dual ledger: API-equivalent $ ≠ ChatGPT seat invoice
+</footer>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+# Local data & secrets
+data/*.db
+data/*.db-*
+data/*.json
+data/*.csv
+!data/.gitkeep
+web/data.json
+.env
+.env.*
+*.pem
+auth.json
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
