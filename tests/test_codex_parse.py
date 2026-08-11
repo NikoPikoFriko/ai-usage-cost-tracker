@@ -46,15 +46,17 @@ def test_db_upsert_idempotent(tmp_path: Path):
     db.close()
 
 
-def test_late_model_fixture_shape_loads():
-    """Static late-model fixture must exist and parse (model assignment may be unknown pre-I1)."""
+def test_late_model_two_pass_assigns_session_fallback():
+    """token_count before first model line gets session last-known model (I1)."""
     assert LATE.is_file()
     rates = load_pricing(PRICING)
     events, meta = parse_rollout_file(LATE, rates)
     assert meta["session_id"] == "ses-late-model"
     assert len(events) == 2
-    # Second turn always has prior model after forward scan reaches response_item
+    # First turn has no prior model → session last-known (later discovery)
+    assert events[0].model == "gpt-5.6-terra"
     assert events[1].model == "gpt-5.6-terra"
+    assert events[0].cost_usd is not None
 
 
 def test_multi_model_fixture():
