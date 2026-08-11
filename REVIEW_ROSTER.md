@@ -38,7 +38,7 @@
 | I2 | D1 | P2 | Incremental ingest | M | PENDING |
 | I4 | D5 | P1 | Real date filters | S | PENDING |
 | I5 | D5 | P2 | Estimate banner | S | PENDING |
-| I10 | D7 | P1 | More fixtures | S | PENDING |
+| I10 | D7 | P1 | More fixtures | S | **IN PR / PENDING REVIEW** |
 | I12 | D1 | P2 | Subagent rollup | M | PENDING |
 
 ## Approval log

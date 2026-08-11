@@ -1,0 +1,4 @@
+{"timestamp": "2026-08-10T15:00:00.000Z", "type": "session_meta", "payload": {"session_id": "ses-zero", "id": "ses-zero", "cwd": "D:/Projects/active/zero", "originator": "codex_cli", "source": "cli", "timestamp": "2026-08-10T15:00:00.000Z"}}
+{"timestamp": "2026-08-10T15:00:01.000Z", "type": "response_item", "payload": {"type": "message", "model": "gpt-5.6-terra"}}
+{"timestamp": "2026-08-10T15:00:02.000Z", "type": "event_msg", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0, "total_tokens": 0}}, "rate_limits": {"plan_type": "team"}}}
+{"timestamp": "2026-08-10T15:00:03.000Z", "type": "event_msg", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 300, "output_tokens": 30, "cached_input_tokens": 0, "total_tokens": 330}}, "rate_limits": {"plan_type": "team"}}}
