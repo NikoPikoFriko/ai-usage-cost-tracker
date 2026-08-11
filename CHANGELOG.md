@@ -7,10 +7,15 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Planned
-- ChatGPT subscription / export lane
-- Optional OpenAI Usage / Costs API reconciliation
-- PyPI package
+### Added
+- Developmental directions seed: `docs/DIRECTIONS.md` (D1–D8)
+- Review roster seed proposals I1–I12 in `REVIEW_ROSTER.md`
+
+### Planned (by wave)
+- **v0.1.x** — Codex hardening + pricing aliases (D1, D4, D7)
+- **v0.2** — Honest ChatGPT lane + UX banners (D2, D5)
+- **v0.3** — Opt-in Usage/Costs API reconcile (D3)
+- **v0.4** — PyPI packaging (D6)
 
 ## [0.1.0] — 2026-08-11
 

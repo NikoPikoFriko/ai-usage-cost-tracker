@@ -98,13 +98,17 @@ web/                        # MAXres static UI
 tests/                      # pytest
 ```
 
-## Roadmap
+## Roadmap / directions
 
-- [x] v0.1 Codex JSONL + local UI  
-- [ ] ChatGPT subscription / export lane (honest dual ledger)  
-- [ ] Optional OpenAI Usage / Costs API reconciliation  
-- [ ] `pip install` / PyPI package  
-- [ ] macOS / Linux CI matrix smoke  
+See **[docs/DIRECTIONS.md](docs/DIRECTIONS.md)** (seeded tracks D1–D8) and **[REVIEW_ROSTER.md](REVIEW_ROSTER.md)** for reviewable implementation items.
+
+| Wave | Theme |
+|------|--------|
+| v0.1.x | Codex hardening + pricing fidelity |
+| v0.2 | Honest ChatGPT lane + UX |
+| v0.3 | Opt-in org Usage API reconcile |
+| v0.4 | PyPI packaging |
+| v1.0 | Boring reliable dual-ledger local tool |
 
 ## Contributing
 
