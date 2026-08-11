@@ -1,10 +1,10 @@
-"""SQLite store for usage_events."""
+"""SQLite store for multi-provider usage_events."""
 
 from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable
 
 from src.models import UsageEvent
 
@@ -17,9 +17,11 @@ CREATE TABLE IF NOT EXISTS usage_events (
   parent_event_id TEXT,
   ts_utc TEXT NOT NULL,
   model TEXT NOT NULL,
+  grain TEXT NOT NULL DEFAULT 'unknown',
+  money_rail TEXT NOT NULL DEFAULT 'unknown',
   prompt_text_hash TEXT,
-  input_tokens INTEGER NOT NULL,
-  output_tokens INTEGER NOT NULL,
+  input_tokens INTEGER,
+  output_tokens INTEGER,
   cached_input_tokens INTEGER,
   reasoning_tokens INTEGER,
   cache_write_input_tokens INTEGER,
@@ -63,7 +65,18 @@ CREATE TABLE IF NOT EXISTS sessions_meta (
   model_default TEXT,
   originator TEXT
 );
+
+CREATE TABLE IF NOT EXISTS schema_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 """
+
+# Columns expected after migrate
+_EXPECTED_COLS = {
+    "grain",
+    "money_rail",
+}
 
 
 class TrackerDB:
@@ -73,7 +86,57 @@ class TrackerDB:
         self.conn = sqlite3.connect(str(path))
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self) -> None:
+        cols = {
+            r[1]
+            for r in self.conn.execute("PRAGMA table_info(usage_events)").fetchall()
+        }
+        if "grain" not in cols:
+            self.conn.execute(
+                "ALTER TABLE usage_events ADD COLUMN grain TEXT NOT NULL DEFAULT 'unknown'"
+            )
+        if "money_rail" not in cols:
+            self.conn.execute(
+                "ALTER TABLE usage_events ADD COLUMN money_rail TEXT NOT NULL DEFAULT 'unknown'"
+            )
+        # Re-read cols after ALTER
+        cols = {
+            r[1]
+            for r in self.conn.execute("PRAGMA table_info(usage_events)").fetchall()
+        }
+        if "money_rail" in cols:
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_events_rail ON usage_events(money_rail)"
+            )
+        # Backfill codex-like rows missing grain/rail
+        if "grain" in cols:
+            self.conn.execute(
+                """
+                UPDATE usage_events
+                SET grain = 'turn'
+                WHERE (grain IS NULL OR grain = '' OR grain = 'unknown')
+                  AND source_product = 'codex'
+                  AND ingest_channel LIKE 'codex%'
+                """
+            )
+        if "money_rail" in cols:
+            self.conn.execute(
+                """
+                UPDATE usage_events
+                SET money_rail = CASE
+                  WHEN billing_identity = 'api_org' THEN 'api_metered'
+                  WHEN source_product = 'codex' THEN 'credits'
+                  ELSE COALESCE(NULLIF(money_rail, 'unknown'), 'unknown')
+                END
+                WHERE money_rail IS NULL OR money_rail = '' OR money_rail = 'unknown'
+                """
+            )
+        self.conn.execute(
+            "INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('version', '0.2-plane')"
+        )
 
     def close(self) -> None:
         self.conn.close()
@@ -83,15 +146,17 @@ class TrackerDB:
         sql = """
         INSERT INTO usage_events (
           event_id, source_product, source_surface, session_id, parent_event_id,
-          ts_utc, model, prompt_text_hash, input_tokens, output_tokens,
-          cached_input_tokens, reasoning_tokens, cache_write_input_tokens, total_tokens,
+          ts_utc, model, grain, money_rail, prompt_text_hash,
+          input_tokens, output_tokens, cached_input_tokens, reasoning_tokens,
+          cache_write_input_tokens, total_tokens,
           unit_price_in_per_1m, unit_price_out_per_1m, unit_price_cached_in_per_1m,
           cost_usd, pricing_as_of, billing_identity, service_tier,
           evidence_class, ingest_channel, raw_ref, notes, label
         ) VALUES (
           :event_id, :source_product, :source_surface, :session_id, :parent_event_id,
-          :ts_utc, :model, :prompt_text_hash, :input_tokens, :output_tokens,
-          :cached_input_tokens, :reasoning_tokens, :cache_write_input_tokens, :total_tokens,
+          :ts_utc, :model, :grain, :money_rail, :prompt_text_hash,
+          :input_tokens, :output_tokens, :cached_input_tokens, :reasoning_tokens,
+          :cache_write_input_tokens, :total_tokens,
           :unit_price_in_per_1m, :unit_price_out_per_1m, :unit_price_cached_in_per_1m,
           :cost_usd, :pricing_as_of, :billing_identity, :service_tier,
           :evidence_class, :ingest_channel, :raw_ref, :notes, :label
@@ -104,8 +169,13 @@ class TrackerDB:
           pricing_as_of=excluded.pricing_as_of,
           evidence_class=excluded.evidence_class,
           model=excluded.model,
+          grain=excluded.grain,
+          money_rail=excluded.money_rail,
           label=excluded.label,
-          notes=excluded.notes
+          notes=excluded.notes,
+          input_tokens=excluded.input_tokens,
+          output_tokens=excluded.output_tokens,
+          cached_input_tokens=excluded.cached_input_tokens
         """
         cur = self.conn.cursor()
         for ev in events:
@@ -167,7 +237,6 @@ class TrackerDB:
         return {r["session_id"]: dict(r) for r in rows}
 
     def reprice_all(self, price_fn) -> int:
-        """Recompute cost fields for all events via price_fn(row)->dict updates."""
         rows = self.fetch_all_events()
         n = 0
         for row in rows:

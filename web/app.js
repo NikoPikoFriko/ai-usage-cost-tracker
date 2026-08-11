@@ -1,6 +1,7 @@
 (function () {
   const state = {
     channel: "all",
+    rollup: "by_rail",
     gapOnly: false,
     unpricedOnly: false,
     q: "",
@@ -12,26 +13,52 @@
   const sessionTitle = (id) =>
     (data.sessions.find((s) => s.session_id === id) || {}).title || id;
 
+  function productLabel(p) {
+    const map = {
+      codex: "Codex",
+      chatgpt: "ChatGPT",
+      grok: "Grok",
+      claude: "Claude",
+      perplexity: "Perplexity",
+    };
+    return map[p] || p;
+  }
+
+  function badge(ch) {
+    const safe = (ch || "unknown").replace(/[^a-z0-9_-]/gi, "");
+    return (
+      '<span class="badge badge-' +
+      safe +
+      '">' +
+      productLabel(ch) +
+      "</span>"
+    );
+  }
+
+  function eventPasses(e) {
+    if (state.channel !== "all" && e.channel !== state.channel) return false;
+    if (state.rollup === "metered_only" && e.money_rail !== "api_metered") return false;
+    if (state.gapOnly && e.grade !== "GAP") return false;
+    if (state.unpricedOnly && e.cost_usd != null) return false;
+    if (state.pin && e.session_id !== state.pin) return false;
+    if (state.q) {
+      const hay = [
+        e.label,
+        e.model,
+        e.session_id,
+        e.channel,
+        e.money_rail,
+        sessionTitle(e.session_id),
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(state.q.toLowerCase())) return false;
+    }
+    return true;
+  }
+
   function filteredEvents() {
-    return (data.events || []).filter((e) => {
-      if (state.channel !== "all" && e.channel !== state.channel) return false;
-      if (state.gapOnly && e.grade !== "GAP") return false;
-      if (state.unpricedOnly && e.cost_usd != null) return false;
-      if (state.pin && e.session_id !== state.pin) return false;
-      if (state.q) {
-        const hay = [
-          e.label,
-          e.model,
-          e.session_id,
-          e.channel,
-          sessionTitle(e.session_id),
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!hay.includes(state.q.toLowerCase())) return false;
-      }
-      return true;
-    });
+    return (data.events || []).filter(eventPasses);
   }
 
   function filteredSessions() {
@@ -46,7 +73,7 @@
         if (!hay.includes(state.q.toLowerCase()) && !ev.some((e) => e.session_id === s.session_id))
           return false;
       }
-      if ((state.gapOnly || state.unpricedOnly || state.q) && !state.pin) {
+      if ((state.gapOnly || state.unpricedOnly || state.q || state.rollup === "metered_only") && !state.pin) {
         return ev.some((e) => e.session_id === s.session_id);
       }
       return true;
@@ -55,7 +82,7 @@
     sessions = sessions.map((s) => {
       const vis = filteredEvents().filter((e) => e.session_id === s.session_id);
       const use =
-        state.gapOnly || state.unpricedOnly || state.q || state.pin
+        state.gapOnly || state.unpricedOnly || state.q || state.pin || state.rollup === "metered_only"
           ? vis
           : (data.events || []).filter((e) => e.session_id === s.session_id);
       const priced = use.filter((e) => e.cost_usd != null);
@@ -82,18 +109,79 @@
     return sessions;
   }
 
-  function badge(ch) {
-    const label = ch === "chatgpt" ? "ChatGPT" : "Codex";
-    return '<span class="badge badge-' + ch + '">' + label + "</span>";
+  function renderProviderChips() {
+    const host = document.getElementById("provider-chips");
+    const providers = (data.totals && data.totals.providers) || [];
+    const opts = ["all"].concat(providers);
+    host.innerHTML = opts
+      .map((p) => {
+        const val = p;
+        const label = p === "all" ? "All agents" : productLabel(p);
+        const checked = state.channel === val ? "checked" : "";
+        return (
+          '<label class="chip"><input type="radio" name="ch" value="' +
+          val +
+          '" ' +
+          checked +
+          "/> " +
+          label +
+          "</label>"
+        );
+      })
+      .join(" ");
+    host.querySelectorAll('input[name="ch"]').forEach((r) => {
+      r.addEventListener("change", () => {
+        state.channel = r.value;
+        render();
+      });
+    });
+  }
+
+  function renderRailStrip(events) {
+    const host = document.getElementById("rail-strip");
+    const byRail = {};
+    events.forEach((e) => {
+      if (e.cost_usd == null) return;
+      const r = e.money_rail || "unknown";
+      byRail[r] = (byRail[r] || 0) + e.cost_usd;
+    });
+    const rails = Object.keys(byRail).sort();
+    if (!rails.length) {
+      host.innerHTML = "";
+      return;
+    }
+    host.innerHTML = rails
+      .map(
+        (r) =>
+          '<div class="stat"><b>$' +
+          byRail[r].toFixed(4) +
+          "</b><span>" +
+          r +
+          "</span></div>"
+      )
+      .join("");
   }
 
   function renderTotals(events, sessions) {
-    const cost = events.reduce((a, e) => a + (e.cost_usd == null ? 0 : e.cost_usd), 0);
+    const priced = events.filter((e) => e.cost_usd != null);
+    let cost = priced.reduce((a, e) => a + e.cost_usd, 0);
+    if (state.rollup === "metered_only") {
+      cost = priced
+        .filter((e) => e.money_rail === "api_metered")
+        .reduce((a, e) => a + e.cost_usd, 0);
+    }
     const tin = events.reduce((a, e) => a + (e.tokens_in || 0), 0);
     const tout = events.reduce((a, e) => a + (e.tokens_out || 0), 0);
     const unpriced = events.filter((e) => e.cost_usd == null).length;
     const pct = events.length ? Math.round((100 * unpriced) / events.length) : 0;
+    const label =
+      state.rollup === "all_labeled"
+        ? "All $ (see rails)"
+        : state.rollup === "metered_only"
+          ? "Metered $"
+          : "Visible $";
     document.querySelector("#stat-cost b").textContent = "$" + cost.toFixed(4);
+    document.querySelector("#stat-cost span").textContent = label;
     document.querySelector("#stat-tokens b").textContent = fmtInt(tin + tout);
     document.querySelector("#stat-split b").textContent =
       fmtInt(tin) + " / " + fmtInt(tout);
@@ -104,6 +192,7 @@
       ? Math.round((100 * (events.length - unpriced)) / events.length)
       : 0;
     document.querySelector("#coverage-bar i").style.width = cov + "%";
+    renderRailStrip(events);
   }
 
   function renderSessions(sessions) {
@@ -195,7 +284,9 @@
           "</td>" +
           "<td>" +
           (e.label || "") +
-          "</td>" +
+          ' <span class="muted mono">' +
+          (e.money_rail || "") +
+          "</span></td>" +
           '<td class="hi-only">' +
           (e.role || "") +
           "</td>" +
@@ -261,7 +352,10 @@
     renderSessions(sessions);
     renderEvents(events);
     renderGaps(events);
-    const bits = [data.meta && data.meta.data_class ? data.meta.data_class : "DATA"];
+    const bits = [
+      (data.meta && data.meta.data_class) || "DATA",
+      "rollup:" + state.rollup,
+    ];
     if (state.channel !== "all") bits.push(state.channel);
     if (state.gapOnly) bits.push("GAP");
     if (state.unpricedOnly) bits.push("unpriced");
@@ -271,9 +365,9 @@
   }
 
   function bind() {
-    document.querySelectorAll('input[name="ch"]').forEach((r) => {
+    document.querySelectorAll('input[name="rollup"]').forEach((r) => {
       r.addEventListener("change", () => {
-        state.channel = r.value;
+        state.rollup = r.value;
         render();
       });
     });
@@ -291,14 +385,16 @@
     });
     document.getElementById("btn-clear-filters").addEventListener("click", () => {
       state.channel = "all";
+      state.rollup = "by_rail";
       state.gapOnly = false;
       state.unpricedOnly = false;
       state.q = "";
       state.pin = null;
-      document.querySelector('input[name="ch"][value="all"]').checked = true;
+      document.querySelector('input[name="rollup"][value="by_rail"]').checked = true;
       document.getElementById("gap-only").checked = false;
       document.getElementById("unpriced-only").checked = false;
       document.getElementById("filter-search").value = "";
+      renderProviderChips();
       render();
     });
     document.getElementById("btn-clear-pin").addEventListener("click", () => {
@@ -336,12 +432,13 @@
         "Last export: " +
         ((data.meta && data.meta.generated_at) || "—") +
         " · " +
-        ((data.meta && data.meta.note) || "local-first");
+        ((data.meta && data.meta.note) || "local-first multi-provider plane");
+      renderProviderChips();
       render();
     } catch (err) {
       document.getElementById("load-error").hidden = false;
       document.getElementById("load-error").textContent =
-        "Could not load data.json. Run: python -m src.cli ingest codex-jsonl  then open via python -m src.cli serve  (file:// may block fetch). " +
+        "Could not load data.json. Run: python -m src.cli ingest codex-jsonl  then python -m src.cli serve. " +
         err;
     }
   }

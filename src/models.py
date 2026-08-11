@@ -1,25 +1,31 @@
-"""Usage event dataclasses (FC-2026-08-10-AI-USAGE-COST)."""
+"""Usage event dataclasses — multi-provider spend plane."""
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
+# Open set examples: codex, chatgpt, grok, claude, perplexity, ...
+# grain: turn | request | session | day | subscription_period | bucket | unknown
+# money_rail: api_metered | subscription | credits | shadow_estimate | invoice_line | unknown
+
 
 @dataclass
 class UsageEvent:
     event_id: str
-    source_product: str  # chatgpt | codex
+    source_product: str
     session_id: str
     ts_utc: str
     model: str
-    input_tokens: int
-    output_tokens: int
     evidence_class: str
     ingest_channel: str
+    grain: str = "unknown"
+    money_rail: str = "unknown"
     source_surface: Optional[str] = None
     parent_event_id: Optional[str] = None
     prompt_text_hash: Optional[str] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
     cached_input_tokens: Optional[int] = None
     reasoning_tokens: Optional[int] = None
     cache_write_input_tokens: Optional[int] = None
@@ -33,7 +39,7 @@ class UsageEvent:
     service_tier: Optional[str] = None
     raw_ref: Optional[str] = None
     notes: Optional[str] = None
-    label: Optional[str] = None  # UI-only short label (not full prompt)
+    label: Optional[str] = None
 
     def to_row(self) -> dict[str, Any]:
         return asdict(self)
@@ -54,3 +60,4 @@ class SessionRollup:
     grade: str = "CAND"
     coverage: str = "0/0"
     source_surface: Optional[str] = None
+    money_rails: list[str] = field(default_factory=list)

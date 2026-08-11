@@ -7,10 +7,17 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Planned
-- ChatGPT subscription / export lane
-- Optional OpenAI Usage / Costs API reconciliation
-- PyPI package
+### Added
+- **D9 multi-provider spend plane** (NEW DIRECTION): open `source_product`, `grain`, `money_rail`
+- Docs: `docs/SCHEMA.md`, `docs/ADAPTER_PROTOCOL.md`, updated `docs/DIRECTIONS.md`
+- UI: dynamic provider filters + **by_rail** / metered_only / all_labeled rollup
+- Export totals: `cost_by_rail`, `cost_by_product`, `cost_usd_metered_only`
+- Codex rows tagged `grain=turn`, `money_rail=credits|api_metered`
+
+### Planned (by wave)
+- **U1** Grok local sessions adapter
+- **U2** Claude · **U3** Perplexity · ChatGPT subscription ledger
+- Adapter registry CLI · PyPI packaging
 
 ## [0.1.0] — 2026-08-11
 

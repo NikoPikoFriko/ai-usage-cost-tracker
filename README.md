@@ -1,12 +1,15 @@
 # AI Usage Cost Tracker
 
-**Local-first** cost ledger for **OpenAI Codex** (and planned ChatGPT surfaces): tokens → USD at **turn / session** resolution.
+**Local-first personal AI spend observatory** — tokens and/or billed money across the agents you actually pay for (**Codex**, **Grok**, **Claude**, **Perplexity**, **ChatGPT**, …), at the resolution each platform exposes.
 
 ```text
-your machine  →  ingest Codex JSONL  →  SQLite  →  price with rate card  →  MAXres web UI
+adapters (per provider)  →  shared usage_event  →  SQLite  →  MAXres UI
+     grain + money_rail declared     N-way ledger (no fake single invoice)
 ```
 
 No cloud account required. Your usage data stays on disk.
+
+**Axis:** multi-provider plane ([docs/DIRECTIONS.md](docs/DIRECTIONS.md) D9) — not “OpenAI-only polish.”
 
 [![CI](https://github.com/NikoPikoFriko/ai-usage-cost-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/NikoPikoFriko/ai-usage-cost-tracker/actions/workflows/ci.yml)
 
@@ -98,13 +101,17 @@ web/                        # MAXres static UI
 tests/                      # pytest
 ```
 
-## Roadmap
+## Roadmap / directions
 
-- [x] v0.1 Codex JSONL + local UI  
-- [ ] ChatGPT subscription / export lane (honest dual ledger)  
-- [ ] Optional OpenAI Usage / Costs API reconciliation  
-- [ ] `pip install` / PyPI package  
-- [ ] macOS / Linux CI matrix smoke  
+See **[docs/DIRECTIONS.md](docs/DIRECTIONS.md)** (seeded tracks D1–D8) and **[REVIEW_ROSTER.md](REVIEW_ROSTER.md)** for reviewable implementation items.
+
+| Wave | Theme |
+|------|--------|
+| v0.1.x | Codex hardening + pricing fidelity |
+| v0.2 | Honest ChatGPT lane + UX |
+| v0.3 | Opt-in org Usage API reconcile |
+| v0.4 | PyPI packaging |
+| v1.0 | Boring reliable dual-ledger local tool |
 
 ## Contributing
 
