@@ -34,12 +34,12 @@
 | IU6 | D4/D9 | P2 | Multi-provider pricing docs | S | PENDING |
 | IU7 | D9/U2 | P2 | Claude adapter | L | PENDING |
 | IU8 | D9/U3 | P2 | Perplexity sub/invoice adapter | M | PENDING |
-| I1 | D1 | P1 | Codex model discovery | M | **IN PR / PENDING REVIEW** |
+| I1 | D1 | P1 | Codex model discovery | M | **DONE** (merged) |
 | I2 | D1 | P2 | Incremental ingest | M | PENDING |
-| I3 | D4 | P1 | Model alias resolve | S | **IN PR / PENDING REVIEW** |
-| I4 | D5 | P1 | Real date filters | S | PENDING |
+| I3 | D4 | P1 | Model alias resolve | S | **DONE** (merged) |
+| I4 | D5 | P1 | Real date filters | S | **DONE** (this PR) |
 | I5 | D5 | P2 | Estimate banner | S | PENDING |
-| I10 | D7 | P1 | More fixtures | S | **IN PR / PENDING REVIEW** |
+| I10 | D7 | P1 | More fixtures | S | **DONE** (merged) |
 | I12 | D1 | P2 | Subagent rollup | M | PENDING |
 
 ## Approval log

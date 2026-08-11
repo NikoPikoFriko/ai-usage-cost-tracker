@@ -1,6 +1,7 @@
 (function () {
   const state = {
     channel: "all",
+    period: "all",
     rollup: "by_rail",
     gapOnly: false,
     unpricedOnly: false,
@@ -12,6 +13,35 @@
   const fmtInt = (n) => (n == null ? "—" : Number(n).toLocaleString());
   const sessionTitle = (id) =>
     (data.sessions.find((s) => s.session_id === id) || {}).title || id;
+
+  /** Event timestamp: prefer ts_utc (schema), fall back to ts. */
+  function eventTs(e) {
+    return e.ts_utc || e.ts || "";
+  }
+
+  /** Period window start in ms, or null for All. Client-only on data.json. */
+  function periodCutoffMs(period) {
+    if (!period || period === "all") return null;
+    const now = Date.now();
+    if (period === "today") {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    }
+    if (period === "7d") return now - 7 * 24 * 3600 * 1000;
+    if (period === "30d") return now - 30 * 24 * 3600 * 1000;
+    return null;
+  }
+
+  function eventInPeriod(e) {
+    const cut = periodCutoffMs(state.period);
+    if (cut == null) return true;
+    const raw = eventTs(e);
+    if (!raw) return false;
+    const t = Date.parse(raw);
+    if (Number.isNaN(t)) return false;
+    return t >= cut;
+  }
 
   function productLabel(p) {
     const map = {
@@ -37,6 +67,7 @@
 
   function eventPasses(e) {
     if (state.channel !== "all" && e.channel !== state.channel) return false;
+    if (!eventInPeriod(e)) return false;
     if (state.rollup === "metered_only" && e.money_rail !== "api_metered") return false;
     if (state.gapOnly && e.grade !== "GAP") return false;
     if (state.unpricedOnly && e.cost_usd != null) return false;
@@ -73,7 +104,14 @@
         if (!hay.includes(state.q.toLowerCase()) && !ev.some((e) => e.session_id === s.session_id))
           return false;
       }
-      if ((state.gapOnly || state.unpricedOnly || state.q || state.rollup === "metered_only") && !state.pin) {
+      if (
+        (state.gapOnly ||
+          state.unpricedOnly ||
+          state.q ||
+          state.rollup === "metered_only" ||
+          state.period !== "all") &&
+        !state.pin
+      ) {
         return ev.some((e) => e.session_id === s.session_id);
       }
       return true;
@@ -82,7 +120,12 @@
     sessions = sessions.map((s) => {
       const vis = filteredEvents().filter((e) => e.session_id === s.session_id);
       const use =
-        state.gapOnly || state.unpricedOnly || state.q || state.pin || state.rollup === "metered_only"
+        state.gapOnly ||
+        state.unpricedOnly ||
+        state.q ||
+        state.pin ||
+        state.rollup === "metered_only" ||
+        state.period !== "all"
           ? vis
           : (data.events || []).filter((e) => e.session_id === s.session_id);
       const priced = use.filter((e) => e.cost_usd != null);
@@ -264,7 +307,7 @@
       ? "Session: " + sessionTitle(state.pin)
       : "Showing: all events (filtered)";
     document.getElementById("event-empty").hidden = events.length > 0;
-    const sorted = events.slice().sort((a, b) => (b.ts || "").localeCompare(a.ts || ""));
+    const sorted = events.slice().sort((a, b) => eventTs(b).localeCompare(eventTs(a)));
     tb.innerHTML = sorted
       .map((e) => {
         const costCell =
@@ -274,7 +317,7 @@
         return (
           "<tr>" +
           '<td class="mono">' +
-          ((e.ts || "").replace("T", " ").slice(0, 19) || "—") +
+          (eventTs(e).replace("T", " ").slice(0, 19) || "—") +
           "</td>" +
           "<td>" +
           badge(e.channel) +
@@ -355,6 +398,7 @@
     const bits = [
       (data.meta && data.meta.data_class) || "DATA",
       "rollup:" + state.rollup,
+      "period:" + state.period,
     ];
     if (state.channel !== "all") bits.push(state.channel);
     if (state.gapOnly) bits.push("GAP");
@@ -365,6 +409,14 @@
   }
 
   function bind() {
+    document.querySelectorAll('input[name="period"]').forEach((r) => {
+      r.addEventListener("change", () => {
+        if (r.checked) {
+          state.period = r.value;
+          render();
+        }
+      });
+    });
     document.querySelectorAll('input[name="rollup"]').forEach((r) => {
       r.addEventListener("change", () => {
         state.rollup = r.value;
@@ -385,11 +437,13 @@
     });
     document.getElementById("btn-clear-filters").addEventListener("click", () => {
       state.channel = "all";
+      state.period = "all";
       state.rollup = "by_rail";
       state.gapOnly = false;
       state.unpricedOnly = false;
       state.q = "";
       state.pin = null;
+      document.querySelector('input[name="period"][value="all"]').checked = true;
       document.querySelector('input[name="rollup"][value="by_rail"]').checked = true;
       document.getElementById("gap-only").checked = false;
       document.getElementById("unpriced-only").checked = false;
