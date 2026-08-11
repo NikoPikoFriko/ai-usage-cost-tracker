@@ -26,6 +26,12 @@
     <div class="totals-strip" id="rail-strip" aria-label="By money rail"></div>
 
     <div class="filter-bar" id="filter-bar" role="toolbar" aria-label="Filters">
+      <span class="period-chips" id="period-chips" role="group" aria-label="Period">
+        <label class="chip"><input type="radio" name="period" value="all" checked/> All</label>
+        <label class="chip"><input type="radio" name="period" value="today"/> Today</label>
+        <label class="chip"><input type="radio" name="period" value="7d"/> 7d</label>
+        <label class="chip"><input type="radio" name="period" value="30d"/> 30d</label>
+      </span>
       <span class="muted" id="provider-chips"></span>
       <label class="chip"><input type="radio" name="rollup" value="by_rail" checked/> by rail</label>
       <label class="chip"><input type="radio" name="rollup" value="metered_only"/> metered only</label>
