@@ -24,6 +24,10 @@
       <div class="stat stat-gap" id="stat-gap"><b>0%</b><span>Unpriced</span></div>
     </div>
     <div class="totals-strip" id="rail-strip" aria-label="By money rail"></div>
+    <div class="estimate-banner" id="estimate-banner" role="note">
+      <strong>API-equivalent / credits estimate — not a card invoice.</strong>
+      <span id="estimate-banner-detail" class="estimate-banner-detail"></span>
+    </div>
 
     <div class="filter-bar" id="filter-bar" role="toolbar" aria-label="Filters">
       <span class="period-chips" id="period-chips" role="group" aria-label="Period">
@@ -43,7 +47,7 @@
       <label class="chip"><input type="checkbox" id="toggle-low-res"/> LOW RES</label>
     </div>
     <p class="filter-summary" id="filter-summary"></p>
-    <p class="sync-line" id="ledger-note">N-way ledger: rails are not one invoice unless mode is all_labeled.</p>
+    <p class="sync-line" id="ledger-note">N-way ledger: rails stay separate unless rollup is all_labeled. ChatGPT/SuperGrok seats are not per-prompt billed here.</p>
   </div>
 </header>
 
