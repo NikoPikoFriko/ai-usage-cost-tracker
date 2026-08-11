@@ -12,6 +12,11 @@ auth.json
 *.jsonl
 !tests/fixtures/*.jsonl
 
+# Personal track overrides (keep examples tracked)
+personal/channels.override.yaml
+personal/**/*.local.yaml
+personal/**/secrets*
+
 # Python
 __pycache__/
 *.py[cod]

@@ -1,0 +1,9 @@
+# Copy to channels.override.yaml (gitignored) on the personal branch only.
+# Example seat amounts — replace with yours; never commit real secrets.
+
+perplexity-manual:
+  default_monthly_usd: 20
+  # default_period: "2026-08"
+
+gemini-manual:
+  default_monthly_usd: 20

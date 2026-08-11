@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.adapters.codex_jsonl import default_codex_home, ingest_codex_jsonl
+from src.adapters.registry import list_adapters, run_adapter
 from src.cost import load_pricing, price_event_fields
 from src.db import TrackerDB
 from src.export_web import write_web_data
@@ -27,44 +27,74 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _persist_result(channel: str, result, export: bool) -> int:
+    db = TrackerDB(DB_PATH)
+    try:
+        before = db.count_events()
+        n = db.upsert_events(result.events)
+        for m in result.session_metas:
+            db.upsert_session_meta(m)
+        after = db.count_events()
+        stats = result.stats or {}
+        db.record_ingest_run(
+            channel=channel,
+            started_at=_now(),
+            finished_at=_now(),
+            files_seen=int(stats.get("files_seen") or 0),
+            events_upserted=n,
+            events_skipped=int(stats.get("files_error") or 0),
+            notes=json.dumps({"stats": stats, "before": before, "after": after}),
+        )
+    finally:
+        db.close()
+    print(json.dumps(result.stats, indent=2, default=str))
+    print(f"events_upserted: {n}")
+    print(f"db_events_total: {after}")
+    print(f"db: {DB_PATH}")
+    if export:
+        payload = write_web_data(DB_PATH, WEB_DATA)
+        print(
+            f"web data: {WEB_DATA} ({payload['meta']['data_class']}, "
+            f"{payload['totals']['events_n']} events)"
+        )
+    return 0
+
+
+def cmd_ingest_list(_: argparse.Namespace) -> int:
+    for row in list_adapters():
+        print(f"{row['cli_id']:20}  product={row['product']:12}  {row['description']}")
+    return 0
+
+
 def cmd_ingest_codex(args: argparse.Namespace) -> int:
-    home = Path(args.codex_home) if args.codex_home else default_codex_home()
-    started = _now()
-    events, metas, stats = ingest_codex_jsonl(
-        codex_home=home,
+    result = run_adapter(
+        "codex-jsonl",
+        codex_home=Path(args.codex_home) if args.codex_home else None,
         pricing_csv=PRICING,
         include_archived=not args.no_archived,
         max_files=args.max_files,
     )
-    db = TrackerDB(DB_PATH)
-    try:
-        before = db.count_events()
-        n = db.upsert_events(events)
-        for m in metas:
-            db.upsert_session_meta(m)
-        after = db.count_events()
-        db.record_ingest_run(
-            channel="codex_local_session_jsonl",
-            started_at=started,
-            finished_at=_now(),
-            files_seen=stats["files_seen"],
-            events_upserted=n,
-            events_skipped=stats["files_error"],
-            notes=json.dumps({"codex_home": stats["codex_home"], "unique_after": after, "before": before}),
-        )
-    finally:
-        db.close()
+    return _persist_result("codex_local_session_jsonl", result, args.export)
 
-    print(f"codex_home: {stats['codex_home']}")
-    print(f"files_seen: {stats['files_seen']}")
-    print(f"events_parsed: {stats['events']}")
-    print(f"events_upserted: {n}")
-    print(f"db_events_total: {after}")
-    print(f"db: {DB_PATH}")
-    if args.export:
-        payload = write_web_data(DB_PATH, WEB_DATA)
-        print(f"web data: {WEB_DATA} ({payload['meta']['data_class']}, {payload['totals']['events_n']} events)")
-    return 0
+
+def cmd_ingest_perplexity(args: argparse.Namespace) -> int:
+    result = run_adapter(
+        "perplexity-manual",
+        monthly_usd=args.monthly_usd,
+        period=args.period,
+        csv_path=Path(args.csv) if args.csv else None,
+    )
+    return _persist_result("perplexity_manual", result, args.export)
+
+
+def cmd_ingest_gemini(args: argparse.Namespace) -> int:
+    result = run_adapter(
+        "gemini-manual",
+        monthly_usd=args.monthly_usd,
+        period=args.period,
+        csv_path=Path(args.csv) if args.csv else None,
+    )
+    return _persist_result("gemini_manual", result, args.export)
 
 
 def cmd_reprice(_: argparse.Namespace) -> int:
@@ -174,18 +204,41 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="ai-usage-cost-tracker", description="Local AI usage cost tracker (ChatGPT+Codex)")
+    p = argparse.ArgumentParser(
+        prog="ai-usage-cost-tracker",
+        description="Local multi-provider AI spend observatory (Codex, Perplexity, Gemini, …)",
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    ing = sub.add_parser("ingest", help="Ingest a channel")
+    ing = sub.add_parser("ingest", help="Ingest a provider adapter")
     ing_sub = ing.add_subparsers(dest="channel", required=True)
-    c = ing_sub.add_parser("codex-jsonl", help="Parse ~/.codex sessions JSONL")
+
+    lst = ing_sub.add_parser("list", help="List registered adapters")
+    lst.set_defaults(func=cmd_ingest_list)
+
+    c = ing_sub.add_parser("codex-jsonl", help="Codex local session JSONL")
     c.add_argument("--codex-home", default=None, help="Override CODEX_HOME")
     c.add_argument("--no-archived", action="store_true")
     c.add_argument("--max-files", type=int, default=None, help="Limit files (debug)")
     c.add_argument("--export", action="store_true", default=True)
     c.add_argument("--no-export", action="store_false", dest="export")
     c.set_defaults(func=cmd_ingest_codex)
+
+    px = ing_sub.add_parser("perplexity-manual", help="Perplexity seat + optional CSV")
+    px.add_argument("--monthly-usd", type=float, default=None)
+    px.add_argument("--period", default=None, help="YYYY-MM")
+    px.add_argument("--csv", default=None, help="Usage/invoice CSV path")
+    px.add_argument("--export", action="store_true", default=True)
+    px.add_argument("--no-export", action="store_false", dest="export")
+    px.set_defaults(func=cmd_ingest_perplexity)
+
+    ge = ing_sub.add_parser("gemini-manual", help="Gemini seat/budget + optional CSV")
+    ge.add_argument("--monthly-usd", type=float, default=None)
+    ge.add_argument("--period", default=None, help="YYYY-MM")
+    ge.add_argument("--csv", default=None, help="Usage/invoice CSV path")
+    ge.add_argument("--export", action="store_true", default=True)
+    ge.add_argument("--no-export", action="store_false", dest="export")
+    ge.set_defaults(func=cmd_ingest_gemini)
 
     r = sub.add_parser("reprice", help="Recompute costs from pricing CSV")
     r.set_defaults(func=cmd_reprice)

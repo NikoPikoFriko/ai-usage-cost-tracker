@@ -49,14 +49,31 @@ Open **http://127.0.0.1:8765/**
 ### Useful commands
 
 ```bash
-python -m src.cli ingest codex-jsonl          # parse sessions (+ archived)
-python -m src.cli ingest codex-jsonl --no-archived
-python -m src.cli reprice                    # after editing PRICING_MODELS.csv
-python -m src.cli export-web                 # refresh web/data.json
-python -m src.cli stats
+python -m src.cli ingest list                # registered providers
+python -m src.cli ingest codex-jsonl         # Codex local JSONL (turn MAXres)
+python -m src.cli ingest perplexity-manual --monthly-usd 20 --period 2026-08
+python -m src.cli ingest gemini-manual --monthly-usd 20 --period 2026-08
+python -m src.cli ingest gemini-manual --csv tests/fixtures/gemini_sample.csv
+python -m src.cli reprice
+python -m src.cli export-web
 python -m src.cli serve --port 8765
 pytest -q
 ```
+
+Provider docs: [Codex](docs/providers/CODEX.md) · [Perplexity](docs/providers/PERPLEXITY.md) · [Gemini](docs/providers/GEMINI.md)
+
+### Add another AI (community)
+
+Others can open a **provider pack PR** to `master` — see [docs/PROVIDERS.md](docs/PROVIDERS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Two tracks (universal vs personal)
+
+| Track | Branch | For |
+|-------|--------|-----|
+| **Universal** | `master` | Public product + community PRs |
+| **Personal** | `personal` | Your station-only experiments |
+
+Same direction (multi-provider plane). Details: [docs/TRACKS.md](docs/TRACKS.md).
 
 ### Custom Codex home
 

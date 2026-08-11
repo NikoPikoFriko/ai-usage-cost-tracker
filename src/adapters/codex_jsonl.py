@@ -319,3 +319,30 @@ def ingest_codex_jsonl(
         "codex_home": str(home),
     }
     return all_events, metas, stats
+
+
+class CodexJsonlAdapter:
+    """Registry-facing Codex local session adapter."""
+
+    id = CHANNEL_ID
+    product = "codex"
+    description = "Local Codex rollout JSONL (~/.codex/sessions) — turn MAXres tokens"
+
+    def run(
+        self,
+        codex_home: Optional[Path] = None,
+        pricing_csv: Optional[Path] = None,
+        include_archived: bool = True,
+        max_files: Optional[int] = None,
+        **_: Any,
+    ):
+        from src.adapters.base import IngestResult
+
+        events, metas, stats = ingest_codex_jsonl(
+            codex_home=codex_home,
+            pricing_csv=pricing_csv,
+            include_archived=include_archived,
+            max_files=max_files,
+        )
+        return IngestResult(events=events, session_metas=metas, stats=stats)
+

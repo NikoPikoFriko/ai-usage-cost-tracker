@@ -1,9 +1,15 @@
-# Ingest channel registry (ids match ops CHANNELS.csv)
-codex_jsonl:
+# Registered ingest adapters (CLI ids)
+codex-jsonl:
   channel_id: codex_local_session_jsonl
   product: codex
-  # Override with env CODEX_HOME
-  default_home_windows: "%USERPROFILE%\\.codex"
-  session_globs:
-    - sessions/**/rollout-*.jsonl
-    - archived_sessions/**/*.jsonl
+  docs: docs/providers/CODEX.md
+
+perplexity-manual:
+  channel_id: perplexity_manual
+  product: perplexity
+  docs: docs/providers/PERPLEXITY.md
+
+gemini-manual:
+  channel_id: gemini_manual
+  product: gemini
+  docs: docs/providers/GEMINI.md

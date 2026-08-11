@@ -13,11 +13,15 @@ project follows [Semantic Versioning](https://semver.org/).
 - UI: dynamic provider filters + **by_rail** / metered_only / all_labeled rollup
 - Export totals: `cost_by_rail`, `cost_by_product`, `cost_usd_metered_only`
 - Codex rows tagged `grain=turn`, `money_rail=credits|api_metered`
+- **Adapter registry** + CLI `ingest list`
+- Provider packs: **Codex**, **Perplexity** (seat+CSV), **Gemini** (seat+CSV)
+- **Two tracks:** `master` (universal) vs `personal` — [docs/TRACKS.md](docs/TRACKS.md)
+- Community contribution path: [docs/PROVIDERS.md](docs/PROVIDERS.md), provider issue/PR templates
 
 ### Planned (by wave)
-- **U1** Grok local sessions adapter
-- **U2** Claude · **U3** Perplexity · ChatGPT subscription ledger
-- Adapter registry CLI · PyPI packaging
+- **U1** Grok (often personal-first, then promote to master)
+- **U2** Claude community or maintainer pack
+- ChatGPT subscription ledger · PyPI packaging
 
 ## [0.1.0] — 2026-08-11
 
