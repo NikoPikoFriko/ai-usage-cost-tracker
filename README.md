@@ -1,38 +1,120 @@
 # AI Usage Cost Tracker
 
-Local-first cost ledger for **ChatGPT + Codex**, MAXres at **token → prompt/turn → session**.
+**Local-first** cost ledger for **OpenAI Codex** (and planned ChatGPT surfaces): tokens → USD at **turn / session** resolution.
 
-**Ops pack:** `D:\PROJECT_CENTER\20_PROJECTS\AI_USAGE_COST_TRACKER\`  
-**Contract:** `FC-2026-08-10-AI-USAGE-COST`
+```text
+your machine  →  ingest Codex JSONL  →  SQLite  →  price with rate card  →  MAXres web UI
+```
 
-## MVP1 (this repo)
+No cloud account required. Your usage data stays on disk.
 
-1. Ingest Codex session JSONL (`%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl`)
-2. Price turns with `config/PRICING_MODELS.csv`
-3. Store SQLite `data/tracker.db`
-4. Open MAXres UI `web/index.html` (after `export-web`)
+[![CI](https://github.com/NikoPikoFriko/ai-usage-cost-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/NikoPikoFriko/ai-usage-cost-tracker/actions/workflows/ci.yml)
+
+## Features (v0.1)
+
+- **Codex local ingest** — reads `~/.codex/sessions/**/rollout-*.jsonl` (`token_count` / last-turn usage)
+- **Deterministic pricing** — `config/PRICING_MODELS.csv` ($ / 1M tokens)
+- **MAXres UI** — totals → sessions → turns; filters; GAP panel for unpriced models
+- **Privacy default** — no full prompt bodies; does not read `auth.json`
+- **Idempotent re-ingest** — stable `event_id` hashes; safe to re-run
+
+## Requirements
+
+- Python **3.11+** (tested on 3.12)
+- OpenAI **Codex** CLI / desktop that writes local session JSONL
+- Windows, macOS, or Linux
 
 ## Quick start
 
-```powershell
-cd D:\Projects\active\ai-usage-cost-tracker
-python -m pip install -r requirements.txt
+```bash
+git clone https://github.com/NikoPikoFriko/ai-usage-cost-tracker.git
+cd ai-usage-cost-tracker
+
+python -m venv .venv
+# Windows:  .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+
+pip install -r requirements.txt
 python -m src.cli ingest codex-jsonl
-python -m src.cli export-web
-# open web/index.html  OR:
 python -m src.cli serve
 ```
 
-## Honest limits
+Open **http://127.0.0.1:8765/**
 
-| Source | Grain | $ |
-|--------|-------|---|
-| Codex JSONL | per-turn tokens | API-equivalent via rate card |
-| ChatGPT Plus web | not yet | subscription / future MVP2 |
-| OpenAI Usage API | not yet | optional MVP1b |
+> Prefer `serve` over opening `web/index.html` via `file://` — browsers block `fetch` of `data.json` on file URLs.
+
+### Useful commands
+
+```bash
+python -m src.cli ingest codex-jsonl          # parse sessions (+ archived)
+python -m src.cli ingest codex-jsonl --no-archived
+python -m src.cli reprice                    # after editing PRICING_MODELS.csv
+python -m src.cli export-web                 # refresh web/data.json
+python -m src.cli stats
+python -m src.cli serve --port 8765
+pytest -q
+```
+
+### Custom Codex home
+
+```bash
+# env
+set CODEX_HOME=C:\path\to\.codex          # Windows cmd
+$env:CODEX_HOME="C:\path\to\.codex"       # PowerShell
+export CODEX_HOME="$HOME/.codex"          # bash
+
+# or flag
+python -m src.cli ingest codex-jsonl --codex-home /path/to/.codex
+```
+
+## Honest limits (read this)
+
+| Source | Token grain | What $ means |
+|--------|-------------|--------------|
+| **Codex local JSONL** | Per turn (when `token_count` exists) | **API-equivalent** from public rate card |
+| **ChatGPT Plus / web chat** | Not official per-prompt tokens | Not supported yet (subscription ≠ token invoice) |
+| **OpenAI org Usage API** | Time buckets | Not in v0.1 |
+
+- If you use Codex with a **ChatGPT plan**, local $ is a **shadow / rate-card estimate**, not necessarily your Stripe invoice.
+- Session token totals sum **per-turn billed input** (context re-sent each turn). That can look large; it matches how API billing works.
+- Pricing CSV is a **snapshot** — update from [OpenAI pricing](https://developers.openai.com/api/docs/pricing) when models change.
+- Unknown models show as **GAP** until you add a row to `config/PRICING_MODELS.csv` and run `reprice`.
 
 ## Privacy
 
-- Does **not** store full prompts by default.
-- Does **not** read or copy `auth.json`.
-- DB and exports under `data/` are gitignored.
+- Stores turn labels like `turn-3`, token counts, model ids, session ids, local file paths as `raw_ref`.
+- Does **not** ingest prompt text by default.
+- Does **not** open `auth.json` or API keys.
+- `data/tracker.db` and `web/data.json` are **gitignored** — never commit them.
+
+See [SECURITY.md](SECURITY.md).
+
+## Project layout
+
+```text
+config/PRICING_MODELS.csv   # rate card
+src/                        # CLI + adapters + cost + sqlite
+web/                        # MAXres static UI
+tests/                      # pytest
+```
+
+## Roadmap
+
+- [x] v0.1 Codex JSONL + local UI  
+- [ ] ChatGPT subscription / export lane (honest dual ledger)  
+- [ ] Optional OpenAI Usage / Costs API reconciliation  
+- [ ] `pip install` / PyPI package  
+- [ ] macOS / Linux CI matrix smoke  
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). PRs welcome.
+
+## License
+
+[MIT](LICENSE) © 2026 NIKODEM PIKOR
+
+## Disclaimer
+
+Not affiliated with OpenAI. Pricing and product surfaces change; treat numbers as **estimates** for personal insight, not accounting or tax advice.
+

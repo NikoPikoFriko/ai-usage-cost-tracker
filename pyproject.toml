@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-usage-cost-tracker"
+version = "0.1.0"
+description = "Local-first AI usage cost tracker for OpenAI Codex (token → session → USD)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [
+  { name = "NIKODEM PIKOR", email = "niko@mojehawaje.pl" },
+]
+keywords = ["openai", "codex", "tokens", "cost", "usage", "local-first"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Utilities",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+ai-usage-cost = "src.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/NikoPikoFriko/ai-usage-cost-tracker"
+Issues = "https://github.com/NikoPikoFriko/ai-usage-cost-tracker/issues"
+Changelog = "https://github.com/NikoPikoFriko/ai-usage-cost-tracker/blob/master/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+

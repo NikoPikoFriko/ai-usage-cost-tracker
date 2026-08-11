@@ -1,41 +1,18 @@
-# STATUS — ai-usage-cost-tracker
+# STATUS
 
-**Updated:** 2026-08-10  
-**Contract:** FC-2026-08-10-AI-USAGE-COST  
-**Phase:** MVP1 live
+**Version:** 0.1.0  
+**Track:** Path A open source
 
-## Acceptance
+## Done
 
-| Check | Status |
-|-------|--------|
-| Code home `D:\Projects\active\ai-usage-cost-tracker` | OK |
-| Schema matches ops usage_event | OK |
-| Pricing join + historical fallback | OK |
-| Codex JSONL ingest | OK — 278 files, 21362 events, 125 sessions |
-| MAXres UI export | OK — `web/data.json` LIVE |
-| Privacy (no prompt bodies) | OK |
-| Idempotent re-ingest | OK — row count stable |
-| pytest | OK — 6 passed |
+- [x] MVP1 Codex JSONL + MAXres UI  
+- [x] MIT license + SECURITY + CONTRIBUTING + CI  
+- [x] Public README / architecture / publish checklist  
 
-## Live snapshot (post-reprice)
+## Your next human steps
 
-- **API-equivalent cost (priced):** ~$1642.93 (rate-card; ChatGPT plan rail ≠ bank invoice)
-- **Events:** 21362 (20936 priced, 426 GAP unknown model)
-- **Sessions:** 125
-- **Note:** token totals sum **per-turn billed** input (context re-send) — correct for $ math
+1. Create public GitHub repo  
+2. Replace `OWNER` placeholders  
+3. `git push` + tag `v0.1.0`  
 
-## Commands
-
-```powershell
-cd D:\Projects\active\ai-usage-cost-tracker
-python -m src.cli ingest codex-jsonl
-python -m src.cli reprice
-python -m src.cli export-web
-python -m src.cli serve   # http://127.0.0.1:8765/
-```
-
-## Next (MVP1b / MVP2)
-
-1. ChatGPT subscription amortization ledger  
-2. Optional OpenAI Usage API buckets  
-3. Model alias map for remaining unknown  
+See [docs/PUBLISH_CHECKLIST.md](docs/PUBLISH_CHECKLIST.md).

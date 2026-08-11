@@ -1,1 +1,3 @@
+# Runtime: stdlib only for v0.1
+# Dev / CI:
 pytest>=8.0

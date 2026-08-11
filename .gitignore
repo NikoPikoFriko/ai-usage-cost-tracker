@@ -9,6 +9,8 @@ web/data.json
 .env.*
 *.pem
 auth.json
+*.jsonl
+!tests/fixtures/*.jsonl
 
 # Python
 __pycache__/
@@ -19,9 +21,13 @@ venv/
 dist/
 build/
 *.egg-info/
+.coverage
+htmlcov/
 
 # OS / editor
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
+*.swp
+

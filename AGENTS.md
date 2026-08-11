@@ -1,20 +1,27 @@
-# AGENTS — ai-usage-cost-tracker
+# Notes for coding agents
 
-**Ops research SSOT:** `D:\PROJECT_CENTER\20_PROJECTS\AI_USAGE_COST_TRACKER\`  
-**Contract:** FC-2026-08-10-AI-USAGE-COST
+This is a **public open-source** local-first project.
 
 ## Rules
-- Git + code only here (`D:\Projects\active\ai-usage-cost-tracker`).
-- **Never** commit API keys, `auth.json`, full prompts, or cookies.
-- Default privacy: no prompt bodies in DB (labels/hashes only).
-- Dual ledger: metered API $ ≠ ChatGPT subscription flat fee.
-- First live channel: Codex local JSONL (`codex_local_session_jsonl`).
+
+- Never commit secrets, `auth.json`, real `tracker.db`, or real session JSONL.
+- Default privacy: no full prompt bodies in the DB.
+- Dual ledger: rate-card $ ≠ ChatGPT subscription invoice.
+- Prefer pytest when changing `cost.py` or adapters.
+- Keep docs honest about ChatGPT Plus token limits.
 
 ## Commands
-```powershell
-cd D:\Projects\active\ai-usage-cost-tracker
-python -m src.cli ingest codex-jsonl
-python -m src.cli export-web
-python -m src.cli serve
+
+```bash
+pip install -r requirements.txt
 pytest -q
+python -m src.cli ingest codex-jsonl
+python -m src.cli serve
 ```
+
+## Layout
+
+- `src/adapters/` — ingest channels  
+- `src/cost.py` — pricing join  
+- `src/db.py` — SQLite  
+- `web/` — static MAXres UI  
