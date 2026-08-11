@@ -25,23 +25,25 @@
 
 | Id | maps_to | Sev | Item | Effort | Status |
 |----|---------|-----|------|--------|--------|
-| **IU0** | D9 | P0 | Docs: D9 + SCHEMA + ADAPTER_PROTOCOL + roster | S | **DONE** (this PR) |
-| **IU1** | D9 | P0 | Schema grain/money_rail + nullable tokens + migrate | M | **IN PROGRESS** |
-| **IU2** | D9 | P0 | UI multi-provider + by_rail totals | M | **IN PROGRESS** |
-| IU3 | D9 | P1 | Adapter protocol code + registry + `ingest --list` | M | PENDING |
+| **IU0** | D9 | P0 | Docs: D9 + SCHEMA + ADAPTER_PROTOCOL + roster | S | **DONE** |
+| **IU1** | D9 | P0 | Schema grain/money_rail + nullable tokens + migrate | M | **DONE** |
+| **IU2** | D9 | P0 | UI multi-provider + by_rail totals | M | **DONE** |
+| IU3 | D9 | P1 | Adapter protocol code + registry + `ingest --list` | M | **DONE** |
 | IU4 | D9/U1 | P1 | Grok local sessions adapter | M | PENDING |
 | IU5 | D2/D9 | P1 | ChatGPT subscription ledger rows | M | PENDING |
 | IU6 | D4/D9 | P2 | Multi-provider pricing docs | S | PENDING |
 | IU7 | D9/U2 | P2 | Claude adapter | L | PENDING |
-| IU8 | D9/U3 | P2 | Perplexity sub/invoice adapter | M | PENDING |
-| I1 | D1 | P1 | Codex model discovery | M | **DONE** (merged) |
+| IU8 | D9/U3 | P2 | Perplexity sub/invoice adapter | M | **DONE** |
+| I1 | D1 | P1 | Codex model discovery | M | **DONE** |
 | I2 | D1 | P2 | Incremental ingest | M | PENDING |
-| I3 | D4 | P1 | Model alias resolve | S | **DONE** (merged) |
-| I4 | D5 | P1 | Real date filters | S | **DONE** (this PR) |
-| I5 | D5 | P2 | Estimate banner | S | PENDING |
-| I10 | D7 | P1 | More fixtures | S | **DONE** (merged) |
+| I3 | D4 | P1 | Model alias resolve | S | **DONE** |
+| I4 | D5 | P1 | Real date filters | S | **DONE** |
+| I5 | D5 | P2 | Estimate banner | S | **DONE** (this PR) |
+| I10 | D7 | P1 | More fixtures | S | **DONE** |
 | I12 | D1 | P2 | Subagent rollup | M | PENDING |
-| I13 | D1 | P2 | config.toml default model fallback | S | **IN PR / PENDING REVIEW** |
+| I13 | D1 | P2 | config.toml default model | S | **DONE** |
+| I14 | D4 | P2 | service_tier capture | S | PENDING |
+| I15 | D5 | P2 | Filtered CSV export | S | PENDING |
 
 ## Approval log
 
@@ -50,3 +52,5 @@
 | 2026-08-11 | SEEDED | D1–D8, I\* | Initial |
 | 2026-08-11 | NEW DIRECTION | D9, IU0–IU8 | Multi-provider plane |
 | 2026-08-11 | APPROVE IMPLEMENT | IU0–IU2 | Plan GO default batch |
+| 2026-08-11 | MERGED | I10 I1 I3 I4 I13 | Web BUILD batch |
+| 2026-08-11 | MERGED | I5 | dual-ledger banner |

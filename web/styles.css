@@ -123,3 +123,21 @@ footer {
   margin:1rem 1.25rem; padding:.85rem 1rem; border-radius:12px;
   background:rgba(255,92,138,.1); border:1px solid rgba(255,92,138,.4); color:#ffb4c8;
 }
+
+.estimate-banner {
+  margin: 0 0 .75rem;
+  padding: .55rem .85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(240,180,41,.4);
+  background: rgba(240,180,41,.08);
+  color: var(--text);
+  font-size: .86rem;
+  line-height: 1.4;
+}
+.estimate-banner strong { color: var(--warn); font-weight: 650; }
+.estimate-banner-detail {
+  display: block;
+  margin-top: .25rem;
+  color: var(--muted);
+  font-size: .8rem;
+}

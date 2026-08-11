@@ -236,6 +236,34 @@
       : 0;
     document.querySelector("#coverage-bar i").style.width = cov + "%";
     renderRailStrip(events);
+    renderEstimateBanner(events);
+  }
+
+  function renderEstimateBanner(events) {
+    const detail = document.getElementById("estimate-banner-detail");
+    if (!detail) return;
+    const rails = {};
+    const bills = {};
+    events.forEach((e) => {
+      const r = e.money_rail || "unknown";
+      rails[r] = (rails[r] || 0) + 1;
+      const b = e.billing_identity || "unknown";
+      bills[b] = (bills[b] || 0) + 1;
+    });
+    const railMix = Object.keys(rails)
+      .sort((a, b) => rails[b] - rails[a])
+      .map((r) => r + "×" + rails[r])
+      .join(" · ");
+    const billMix = Object.keys(bills)
+      .sort((a, b) => bills[b] - bills[a])
+      .slice(0, 3)
+      .map((b) => b + "×" + bills[b])
+      .join(" · ");
+    const parts = [];
+    if (railMix) parts.push("Visible rails: " + railMix);
+    if (billMix) parts.push("Billing id: " + billMix);
+    parts.push("Does not claim Plus/Pro per-prompt invoice lines.");
+    detail.textContent = parts.join(" · ");
   }
 
   function renderSessions(sessions) {
