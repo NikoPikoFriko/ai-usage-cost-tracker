@@ -123,6 +123,38 @@ def _extract_model(obj: dict[str, Any], fallback: str) -> str:
     return fallback
 
 
+
+def read_codex_default_model(codex_home: Optional[Path] = None) -> Optional[str]:
+    """Read model-related keys only from CODEX_HOME/config.toml.
+
+    Privacy: never opens auth.json. Only looks for model / model_provider
+    style keys in the TOML text (minimal parse, no full TOML dependency).
+    """
+    home = codex_home or default_codex_home()
+    cfg = home / "config.toml"
+    if not cfg.is_file():
+        return None
+    try:
+        text = cfg.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    # Prefer explicit model = "..." assignments; ignore secrets-looking keys.
+    import re
+
+    # model = "gpt-..." or model = 'gpt-...'
+    for pat in (
+        r'(?m)^\s*model\s*=\s*["\']([^"\']+)["\']',
+        r'(?m)^\s*default_model\s*=\s*["\']([^"\']+)["\']',
+        r'(?m)^\s*model_slug\s*=\s*["\']([^"\']+)["\']',
+    ):
+        m = re.search(pat, text)
+        if m:
+            cand = m.group(1).strip()
+            if _looks_like_model(cand):
+                return cand
+    return None
+
+
 def parse_rollout_file(
     path: Path,
     rates: list,
@@ -336,9 +368,13 @@ def ingest_codex_jsonl(
     all_events: list[UsageEvent] = []
     metas: list[dict[str, Any]] = []
     skipped = 0
+    # Model fallback from config.toml only (never auth.json) — used when JSONL
+    # never exposes a model after two-pass / single-pass assignment.
+    cfg_model = read_codex_default_model(home) or "unknown"
+
     for f in files:
         try:
-            evs, meta = parse_rollout_file(f, rates)
+            evs, meta = parse_rollout_file(f, rates, default_model=cfg_model)
         except Exception:
             skipped += 1
             continue

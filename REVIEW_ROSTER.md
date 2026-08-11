@@ -41,6 +41,7 @@
 | I5 | D5 | P2 | Estimate banner | S | PENDING |
 | I10 | D7 | P1 | More fixtures | S | **DONE** (merged) |
 | I12 | D1 | P2 | Subagent rollup | M | PENDING |
+| I13 | D1 | P2 | config.toml default model fallback | S | **IN PR / PENDING REVIEW** |
 
 ## Approval log
 
