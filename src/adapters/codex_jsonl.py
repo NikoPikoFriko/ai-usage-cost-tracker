@@ -155,6 +155,26 @@ def read_codex_default_model(codex_home: Optional[Path] = None) -> Optional[str]
     return None
 
 
+
+def _extract_service_tier(obj: dict[str, Any], pl: dict[str, Any]) -> Optional[str]:
+    """Pass through service_tier when present — do not invent Fast/Batch rates."""
+    for src in (obj, pl):
+        if not isinstance(src, dict):
+            continue
+        v = src.get("service_tier")
+        if isinstance(v, str) and v.strip():
+            return v.strip()[:64]
+    info = pl.get("info") if isinstance(pl.get("info"), dict) else {}
+    v = info.get("service_tier") if isinstance(info, dict) else None
+    if isinstance(v, str) and v.strip():
+        return v.strip()[:64]
+    rl = pl.get("rate_limits") if isinstance(pl.get("rate_limits"), dict) else {}
+    v = rl.get("service_tier") if isinstance(rl, dict) else None
+    if isinstance(v, str) and v.strip():
+        return v.strip()[:64]
+    return None
+
+
 def parse_rollout_file(
     path: Path,
     rates: list,
@@ -300,6 +320,8 @@ def parse_rollout_file(
             if priced["priced"] and priced.get("rate_evidence") == "CAND":
                 grade = "CAND"
 
+            tier = _extract_service_tier(obj, pl)
+
             eid = _stable_event_id(CHANNEL_ID, session_id, ts, turn_index, last)
             label = f"turn-{turn_index}"
 
@@ -325,6 +347,7 @@ def parse_rollout_file(
                     cost_usd=priced["cost_usd"],
                     pricing_as_of=priced["pricing_as_of"],
                     billing_identity=billing,
+                    service_tier=tier,
                     evidence_class=grade,
                     ingest_channel=CHANNEL_ID,
                     raw_ref=str(path),
