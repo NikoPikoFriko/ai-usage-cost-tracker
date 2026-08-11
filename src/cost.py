@@ -54,13 +54,53 @@ def load_pricing(csv_path: Path) -> list[ModelRate]:
     return rates
 
 
+def default_aliases_path(pricing_csv: Optional[Path] = None) -> Path:
+    if pricing_csv is not None:
+        return pricing_csv.parent / "MODEL_ALIASES.csv"
+    return Path(__file__).resolve().parents[1] / "config" / "MODEL_ALIASES.csv"
+
+
+def load_aliases(csv_path: Optional[Path] = None) -> dict[str, str]:
+    """Map alias model_id → canonical rate-card model_id (case-sensitive strip)."""
+    path = csv_path or default_aliases_path()
+    out: dict[str, str] = {}
+    if not path.is_file():
+        return out
+    with path.open(encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            alias = (row.get("alias") or "").strip()
+            canon = (row.get("canonical_model_id") or "").strip()
+            if alias and canon:
+                out[alias] = canon
+    return out
+
+
+_ALIASES_CACHE: Optional[dict[str, str]] = None
+
+
+def _aliases() -> dict[str, str]:
+    global _ALIASES_CACHE
+    if _ALIASES_CACHE is None:
+        _ALIASES_CACHE = load_aliases()
+    return _ALIASES_CACHE
+
+
+def clear_alias_cache() -> None:
+    """Test helper."""
+    global _ALIASES_CACHE
+    _ALIASES_CACHE = None
+
+
 def resolve_rate(
     rates: list[ModelRate],
     model_id: str,
     as_of: Optional[str] = None,
+    aliases: Optional[dict[str, str]] = None,
 ) -> Optional[ModelRate]:
     """Pick latest rate for model with effective_from <= as_of date.
 
+    Exact model_id first; then MODEL_ALIASES.csv canonical map.
     If the rate card only has a newer snapshot (common for research CSV),
     fall back to the latest known rate for that model so historical sessions
     still get API-equivalent $ (label honesty stays on evidence_class).
@@ -69,13 +109,56 @@ def resolve_rate(
         return None
     mid = model_id.strip()
     as_of_d = _parse_date(as_of or date.today().isoformat())
-    same = [r for r in rates if r.model_id == mid]
-    if not same:
+
+    def _pick(mid_key: str) -> Optional[ModelRate]:
+        same = [r for r in rates if r.model_id == mid_key]
+        if not same:
+            return None
+        candidates = [r for r in same if _parse_date(r.effective_from) <= as_of_d]
+        pool = candidates if candidates else same
+        pool.sort(key=lambda r: _parse_date(r.effective_from), reverse=True)
+        return pool[0]
+
+    hit = _pick(mid)
+    if hit is not None:
+        return hit
+
+    amap = aliases if aliases is not None else _aliases()
+    canon = amap.get(mid)
+    if not canon or canon == mid:
         return None
-    candidates = [r for r in same if _parse_date(r.effective_from) <= as_of_d]
-    pool = candidates if candidates else same  # fallback: latest snapshot
-    pool.sort(key=lambda r: _parse_date(r.effective_from), reverse=True)
-    return pool[0]
+    return _pick(canon.strip())
+
+
+def resolve_rate_with_meta(
+    rates: list[ModelRate],
+    model_id: str,
+    as_of: Optional[str] = None,
+    aliases: Optional[dict[str, str]] = None,
+) -> tuple[Optional[ModelRate], bool]:
+    """Return (rate, used_alias). used_alias True when join needed alias map."""
+    if not model_id:
+        return None, False
+    mid = model_id.strip()
+    as_of_d = _parse_date(as_of or date.today().isoformat())
+
+    def _pick(mid_key: str) -> Optional[ModelRate]:
+        same = [r for r in rates if r.model_id == mid_key]
+        if not same:
+            return None
+        candidates = [r for r in same if _parse_date(r.effective_from) <= as_of_d]
+        pool = candidates if candidates else same
+        pool.sort(key=lambda r: _parse_date(r.effective_from), reverse=True)
+        return pool[0]
+
+    hit = _pick(mid)
+    if hit is not None:
+        return hit, False
+    amap = aliases if aliases is not None else _aliases()
+    canon = amap.get(mid)
+    if not canon or canon == mid:
+        return None, False
+    return _pick(canon.strip()), True
 
 
 def compute_cost_usd(
@@ -125,10 +208,14 @@ def price_event_fields(
     output_tokens: int,
     cached_input_tokens: Optional[int] = None,
     cache_write_input_tokens: Optional[int] = None,
+    aliases: Optional[dict[str, str]] = None,
 ) -> dict:
-    """Return unit prices + cost_usd + pricing_as_of + grade hints."""
+    """Return unit prices + cost_usd + pricing_as_of + grade hints.
+
+    Alias joins are CAND (mapping is inferred) even if the base rate row is OBS.
+    """
     as_of = ts_utc[:10] if ts_utc else None
-    rate = resolve_rate(rates, model, as_of=as_of)
+    rate, used_alias = resolve_rate_with_meta(rates, model, as_of=as_of, aliases=aliases)
     if rate is None:
         return {
             "unit_price_in_per_1m": None,
@@ -138,6 +225,7 @@ def price_event_fields(
             "pricing_as_of": None,
             "priced": False,
             "rate_evidence": None,
+            "used_alias": False,
         }
     cost = compute_cost_usd(
         input_tokens=input_tokens,
@@ -146,6 +234,7 @@ def price_event_fields(
         cached_input_tokens=cached_input_tokens,
         cache_write_input_tokens=cache_write_input_tokens,
     )
+    evidence = "CAND" if used_alias else rate.evidence_class
     return {
         "unit_price_in_per_1m": rate.input_usd_per_1m,
         "unit_price_out_per_1m": rate.output_usd_per_1m,
@@ -153,7 +242,8 @@ def price_event_fields(
         "cost_usd": cost,
         "pricing_as_of": rate.effective_from,
         "priced": True,
-        "rate_evidence": rate.evidence_class,
+        "rate_evidence": evidence,
+        "used_alias": used_alias,
     }
 
 

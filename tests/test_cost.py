@@ -46,3 +46,42 @@ def test_price_known_model():
     assert p["priced"] is True
     assert p["cost_usd"] is not None
     assert p["cost_usd"] > 0
+
+
+def test_alias_resolves_to_canonical():
+    from src.cost import clear_alias_cache, price_event_fields, resolve_rate_with_meta
+
+    clear_alias_cache()
+    rates = load_pricing(PRICING)
+    rate, used = resolve_rate_with_meta(rates, "codex-auto")
+    assert used is True
+    assert rate is not None
+    assert rate.model_id == "gpt-5.6-terra"
+    p = price_event_fields(
+        rates,
+        "codex-auto",
+        "2026-08-10T00:00:00Z",
+        input_tokens=1000,
+        output_tokens=100,
+    )
+    assert p["priced"] is True
+    assert p["used_alias"] is True
+    assert p["rate_evidence"] == "CAND"
+    assert p["cost_usd"] is not None and p["cost_usd"] > 0
+
+
+def test_exact_match_not_forced_cand():
+    from src.cost import clear_alias_cache, price_event_fields
+
+    clear_alias_cache()
+    rates = load_pricing(PRICING)
+    p = price_event_fields(
+        rates,
+        "gpt-5.6-terra",
+        "2026-08-10T00:00:00Z",
+        input_tokens=1000,
+        output_tokens=100,
+    )
+    assert p["priced"] is True
+    assert p["used_alias"] is False
+    assert p["rate_evidence"] == "OBS"
