@@ -37,7 +37,9 @@ def subscription_event(
     notes: Optional[str] = None,
 ) -> UsageEvent:
     start, _, pid = month_bounds(period)
-    eid = stable_hash(channel, product, "subscription", pid, f"{monthly_usd:.4f}")
+    # Period-stable id so correcting --monthly-usd updates the seat row
+    # instead of inserting a second subscription_period event.
+    eid = stable_hash(channel, product, "subscription", pid)
     return UsageEvent(
         event_id=eid,
         source_product=product,

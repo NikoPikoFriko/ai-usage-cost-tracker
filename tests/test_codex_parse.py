@@ -46,6 +46,32 @@ def test_db_upsert_idempotent(tmp_path: Path):
     db.close()
 
 
+def test_same_record_model_not_overwritten_by_later_discovery(tmp_path: Path):
+    """token_count envelope model must win over a later different discovery (I1)."""
+    p = tmp_path / "rollout-same-record-model.jsonl"
+    p.write_text(
+        "\n".join(
+            [
+                '{"timestamp":"2026-08-10T12:00:00Z","type":"session_meta","payload":{"id":"ses-srm","session_id":"ses-srm","cwd":"/tmp/srm"}}',
+                '{"timestamp":"2026-08-10T12:00:01Z","type":"event_msg","model":"gpt-5.6-terra","payload":{"type":"token_count","info":{"model":"gpt-5.6-terra","last_token_usage":{"input_tokens":1000000,"output_tokens":0,"total_tokens":1000000}},"rate_limits":{"plan_type":"team"}}}',
+                '{"timestamp":"2026-08-10T12:00:02Z","type":"response_item","payload":{"type":"message","model":"gpt-5.4-mini"}}',
+                '{"timestamp":"2026-08-10T12:00:03Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":10,"output_tokens":0,"total_tokens":10}},"rate_limits":{"plan_type":"team"}}}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    rates = load_pricing(PRICING)
+    events, meta = parse_rollout_file(p, rates)
+    assert meta["session_id"] == "ses-srm"
+    assert len(events) == 2
+    assert events[0].model == "gpt-5.6-terra"
+    assert events[1].model == "gpt-5.4-mini"
+    # 1M uncached terra input @ $2/1M — must not be priced as mini @ $0.75
+    assert events[0].cost_usd is not None
+    assert abs(events[0].cost_usd - 2.0) < 1e-6
+
+
 def test_late_model_two_pass_assigns_session_fallback():
     """token_count before first model line gets session last-known model (I1)."""
     assert LATE.is_file()

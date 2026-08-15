@@ -28,6 +28,21 @@ def test_perplexity_subscription(tmp_path: Path):
     assert e.input_tokens is None
 
 
+def test_subscription_reingest_updates_amount(tmp_path: Path):
+    """Correcting --monthly-usd must update the seat row, not double-count."""
+    ad = PerplexityManualAdapter()
+    db = TrackerDB(tmp_path / "t.db")
+    first = ad.run(monthly_usd=20.0, period="2026-08")
+    second = ad.run(monthly_usd=22.0, period="2026-08")
+    assert first.events[0].event_id == second.events[0].event_id
+    db.upsert_events(first.events)
+    db.upsert_events(second.events)
+    payload = build_dashboard_payload(db)
+    assert payload["totals"]["events_n"] == 1
+    assert payload["totals"]["cost_by_rail"]["subscription"] == 22.0
+    db.close()
+
+
 def test_gemini_csv(tmp_path: Path):
     ad = GeminiManualAdapter()
     csv_path = ROOT / "tests" / "fixtures" / "gemini_sample.csv"
