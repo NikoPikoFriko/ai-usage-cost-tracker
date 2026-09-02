@@ -1,0 +1,12 @@
+{
+  "name": "AI Usage Cost Tracker",
+  "user": "ubuntu",
+  "install": "sudo ln -sf /usr/bin/python3 /usr/local/bin/python && python -m pip install --user -r requirements.txt",
+  "terminals": [
+    {
+      "name": "web",
+      "command": "python -m src.cli serve --host 127.0.0.1 --port 8765"
+    }
+  ],
+  "ports": [8765]
+}
