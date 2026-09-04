@@ -184,9 +184,10 @@ def parse_rollout_file(
 
     Model assignment is **two-pass**:
     1) Scan all relevant lines; record model discoveries in order.
-    2) For each token_count turn, use the nearest **prior** model in file order;
-       if none yet, fall back to the session last-known model (last discovery
-       in the file); never invent a model id from thin air.
+    2) For each token_count turn, use the model on that record if present,
+       else the nearest **prior** model in file order; if none yet, fall back
+       to the session last-known model (last discovery in the file); never
+       invent a model id from thin air.
     """
     session_id = path.stem  # fallback
     cwd = None
@@ -231,15 +232,15 @@ def parse_rollout_file(
     session_last_model = model_at[-1][1] if model_at else None
 
     def model_for_index(idx: int) -> str:
-        """Nearest prior discovery; else session last-known; else default_model."""
-        prior: Optional[str] = None
+        """Nearest same-record or prior discovery; else session last-known; else default_model."""
+        chosen: Optional[str] = None
         for mi, mid in model_at:
-            if mi < idx:
-                prior = mid
+            if mi <= idx:
+                chosen = mid
             else:
                 break
-        if prior:
-            return prior
+        if chosen:
+            return chosen
         if session_last_model:
             return session_last_model
         return default_model or "unknown"
