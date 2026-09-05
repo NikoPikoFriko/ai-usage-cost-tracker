@@ -1,0 +1,43 @@
+name: Stale queue hygiene
+
+on:
+  schedule:
+    # Weekly at a non-round minute to reduce top-of-hour scheduling contention.
+    - cron: "17 3 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: stale-queue-hygiene
+  cancel-in-progress: false
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label inactive Issues and PRs
+        uses: actions/stale@v11
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          days-before-issue-stale: 30
+          days-before-pr-stale: 14
+          days-before-issue-close: -1
+          days-before-pr-close: -1
+          stale-issue-label: stale
+          stale-pr-label: stale
+          stale-issue-message: >-
+            This Issue has had no human-authored update for 30 days. Please add
+            current scope, evidence, or an implementation owner. A maintainer will
+            review it before any closure; this label is not a quality judgment.
+          stale-pr-message: >-
+            This pull request has had no human-authored update for 14 days. Please
+            confirm ownership and report its CI, conflict, or rebase status. It will
+            not be closed automatically.
+          exempt-draft-pr: true
+          remove-stale-when-updated: true
+          operations-per-run: 50
+          enable-statistics: true
