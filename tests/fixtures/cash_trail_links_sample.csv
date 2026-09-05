@@ -1,0 +1,2 @@
+link_id,invoice_source_record_id,settlement_source_record_id,relation,status,confirmed_by,matched_on
+link_demo_001,inv_demo_001,txn_demo_001,settles,confirmed,operator,"amount,currency,date_window,merchant"

@@ -1,0 +1,3 @@
+source_record_id,posted_date,amount_usd,currency,direction,descriptor,status
+txn_demo_001,2026-08-02,19.37,USD,debit,EXAMPLE AI LABS DEMO,posted
+txn_demo_002,2026-08-06,7.23,USD,debit,UNRELATED SYNTHETIC SOFTWARE,posted
