@@ -30,8 +30,15 @@ currencies.
 `candidate_match` relationships with `candidate`, `confirmed`, or `rejected`
 status. Confirmations require `operator` or an explicit `rule:<id>`. Updates are
 recorded in append-only `cash_link_history`.
+`matched_on` stores only the signal labels `amount`, `currency`, `date_window`,
+`merchant`, and `manual`; it never stores merchant names or free-form notes.
 
 The importer may create a fuzzy `candidate_match`, but never confirms it.
+Missing merchant text is not a similarity signal; without merchants, candidate
+creation requires an exact amount as well as a matching currency and date window.
+Confirmed links require matching currencies. Full settlement/refund amounts must
+match; partial settlements cannot exceed the invoice, and a posted bank row
+cannot be allocated to more than one partial-settlement link.
 Operator-confirmed full settlements count the posted bank row once and retain
 the invoice as supporting evidence. Partial settlements count posted bank rows
 and show the remaining invoice amount separately. Rejected links do not collapse
@@ -48,7 +55,11 @@ credits, API-metered, rate-card, and shadow-estimate rails remain separate.
 Event identity is a deterministic hash of source channel, evidence type, source
 record ID, signed amount, currency, and source date. Re-imports are idempotent.
 Corrected amounts/dates produce distinct evidence records rather than silently
-overwriting an earlier record.
+overwriting an earlier record. The prior row remains in the audit history and
+points to its successor; only the current revision participates in ranges.
+Re-importing an already superseded revision does not make it current again.
+Funny/public exports remap cash link IDs and endpoints with the same ID map used
+for their corresponding events.
 
 Use only user-selected local CSV files:
 

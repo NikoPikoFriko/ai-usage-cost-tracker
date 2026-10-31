@@ -45,6 +45,7 @@ class UsageEvent:
     cash_source_record_id: Optional[str] = None
     cash_status: Optional[str] = None
     cash_merchant: Optional[str] = None
+    cash_superseded_by: Optional[str] = None
 
     def to_row(self) -> dict[str, Any]:
         return asdict(self)

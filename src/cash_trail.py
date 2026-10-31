@@ -16,6 +16,8 @@ from src.models import UsageEvent
 
 CHANNEL = "cash-trail-manual"
 _CURRENCY = re.compile(r"^[A-Z]{3}$")
+_PRODUCT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
+_MATCH_SIGNALS = {"amount", "currency", "date_window", "merchant", "manual"}
 
 
 def _read_rows(path: Path, required: set[str]) -> list[dict[str, str]]:
@@ -112,6 +114,11 @@ def _invoice_events(path: Path) -> list[UsageEvent]:
         if source_id in seen:
             raise ValueError(f"{path}: row {number}: duplicate source_record_id {source_id!r}")
         seen.add(source_id)
+        source_product = row["source_product"].strip() or "unknown_ai"
+        if not _PRODUCT_ID.fullmatch(source_product):
+            raise ValueError(
+                f"{path}: row {number}: source_product must be a safe identifier"
+            )
         date_field = row["invoice_date"]
         day = _date(date_field, path=path, row_number=number)
         currency = _currency(row["currency"], path=path, row_number=number)
@@ -127,7 +134,7 @@ def _invoice_events(path: Path) -> list[UsageEvent]:
         out.append(
             _event(
                 source_id=source_id,
-                source_product=row["source_product"].strip() or "unknown_ai",
+                source_product=source_product,
                 surface="provider_invoice",
                 day=day,
                 amount=amount,
@@ -165,10 +172,15 @@ def _bank_events(path: Path) -> list[UsageEvent]:
         status = row["status"].strip().lower()
         if status not in {"posted", "pending"}:
             raise ValueError(f"{path}: row {number}: status must be posted or pending")
+        source_product = (row.get("source_product") or "unknown_ai").strip()
+        if not _PRODUCT_ID.fullmatch(source_product):
+            raise ValueError(
+                f"{path}: row {number}: source_product must be a safe identifier"
+            )
         out.append(
             _event(
                 source_id=source_id,
-                source_product=(row.get("source_product") or "unknown_ai").strip(),
+                source_product=source_product,
                 surface="bank_statement",
                 day=day,
                 amount=amount,
@@ -187,6 +199,7 @@ def _source_map(db: TrackerDB) -> dict[str, str]:
         """
         SELECT cash_source_record_id, event_id FROM usage_events
         WHERE ingest_channel=? AND cash_source_record_id IS NOT NULL
+          AND cash_superseded_by IS NULL
         ORDER BY rowid
         """,
         (CHANNEL,),
@@ -223,7 +236,9 @@ def _link(
 
 
 def _import_links(
-    path: Path, source_ids: dict[str, str], surfaces: dict[str, str]
+    path: Path,
+    source_ids: dict[str, str],
+    event_info: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
     rows = _read_rows(
         path,
@@ -253,11 +268,17 @@ def _import_links(
             raise ValueError(f"{path}: row {number}: invalid relation {relation!r}")
         if status not in {"candidate", "confirmed", "rejected"}:
             raise ValueError(f"{path}: row {number}: invalid status {status!r}")
-        if surfaces.get(invoice_id) != "provider_invoice":
+        invoice_info = event_info.get(invoice_id, {})
+        settlement_info = event_info.get(settlement_id, {})
+        if invoice_info.get("source_surface") != "provider_invoice":
             raise ValueError(f"{path}: row {number}: invoice ID is not invoice evidence")
-        if surfaces.get(settlement_id) != "bank_statement":
+        if settlement_info.get("source_surface") != "bank_statement":
             raise ValueError(f"{path}: row {number}: settlement ID is not bank evidence")
         confirmed_by = row["confirmed_by"].strip() or None
+        matched_on = row["matched_on"].strip()
+        signals = {signal.strip() for signal in matched_on.split(",") if signal.strip()}
+        if signals - _MATCH_SIGNALS:
+            raise ValueError(f"{path}: row {number}: matched_on contains an unknown signal")
         if status == "confirmed" and confirmed_by != "operator" and not (
             confirmed_by or ""
         ).startswith("rule:"):
@@ -266,6 +287,36 @@ def _import_links(
             )
         if status == "confirmed" and confirmed_by == "rule:":
             raise ValueError(f"{path}: row {number}: deterministic rule ID is required")
+        if status == "confirmed":
+            if relation == "candidate_match":
+                raise ValueError(
+                    f"{path}: row {number}: confirmed links need a cash relationship"
+                )
+            if invoice_info.get("currency") != settlement_info.get("currency"):
+                raise ValueError(
+                    f"{path}: row {number}: confirmed links require matching currencies"
+                )
+            if settlement_info.get("cash_status") != "posted":
+                raise ValueError(
+                    f"{path}: row {number}: only posted bank rows can be confirmed"
+                )
+            invoice_amount = Decimal(str(invoice_info.get("amount_native") or 0))
+            settlement_amount = Decimal(str(settlement_info.get("amount_native") or 0))
+            if relation in {"settles", "refunds"} and abs(invoice_amount) != abs(
+                settlement_amount
+            ):
+                raise ValueError(
+                    f"{path}: row {number}: full settlement/refund amounts must match"
+                )
+            if relation == "partial_settlement" and (
+                not invoice_amount
+                or not settlement_amount
+                or invoice_amount * settlement_amount < 0
+                or abs(settlement_amount) > abs(invoice_amount)
+            ):
+                raise ValueError(
+                    f"{path}: row {number}: invalid partial-settlement amount"
+                )
         links.append(
             _link(
                 invoice_id,
@@ -273,11 +324,78 @@ def _import_links(
                 relation,
                 status,
                 None,
-                row["matched_on"].strip(),
+                ",".join(sorted(signals)),
                 confirmed_by,
             )
         )
     return links
+
+
+def _validate_partial_allocations(
+    db: TrackerDB,
+    links: list[dict[str, Any]],
+    event_info: dict[str, dict[str, Any]],
+) -> None:
+    incoming_ids = {link["link_id"] for link in links}
+    confirmed_links = [
+        link
+        for link in db.fetch_cash_links()
+        if link["status"] == "confirmed" and link["link_id"] not in incoming_ids
+    ] + [link for link in links if link["status"] == "confirmed"]
+    by_settlement: dict[str, list[dict[str, Any]]] = {}
+    for link in confirmed_links:
+        by_settlement.setdefault(link["settlement_event_id"], []).append(link)
+    for bank_links in by_settlement.values():
+        if len(bank_links) <= 1:
+            continue
+        if not all(link["relation"] == "partial_settlement" for link in bank_links) or len(
+            {link["invoice_event_id"] for link in bank_links}
+        ) != 1:
+            raise ValueError(
+                "A bank row may be allocated to only one confirmed settlement relationship"
+            )
+
+    allocated_by_invoice: dict[str, Decimal] = {}
+    settlement_owner: dict[str, tuple[str, str]] = {}
+    for existing in db.fetch_cash_links():
+        if (
+            existing["status"] != "confirmed"
+            or existing["relation"] != "partial_settlement"
+            or existing["link_id"] in incoming_ids
+        ):
+            continue
+        settlement = event_info.get(existing["settlement_event_id"], {})
+        allocated_by_invoice[existing["invoice_event_id"]] = (
+            allocated_by_invoice.get(existing["invoice_event_id"], Decimal(0))
+            + Decimal(str(settlement.get("amount_native") or 0))
+        )
+        settlement_owner[existing["settlement_event_id"]] = (
+            existing["invoice_event_id"],
+            existing["link_id"],
+        )
+
+    for link in links:
+        if link["status"] != "confirmed" or link["relation"] != "partial_settlement":
+            continue
+        owner = settlement_owner.get(link["settlement_event_id"])
+        if owner and owner != (link["invoice_event_id"], link["link_id"]):
+            raise ValueError(
+                "A bank row may fund only one confirmed partial-settlement link"
+            )
+        settlement_owner[link["settlement_event_id"]] = (
+            link["invoice_event_id"],
+            link["link_id"],
+        )
+        invoice_amount = Decimal(
+            str(event_info[link["invoice_event_id"]].get("amount_native") or 0)
+        )
+        settlement_amount = Decimal(
+            str(event_info[link["settlement_event_id"]].get("amount_native") or 0)
+        )
+        allocated = allocated_by_invoice.get(link["invoice_event_id"], Decimal(0))
+        if abs(allocated + settlement_amount) > abs(invoice_amount):
+            raise ValueError("Confirmed partial settlements cannot exceed the invoice amount")
+        allocated_by_invoice[link["invoice_event_id"]] = allocated + settlement_amount
 
 
 def _candidate_links(db: TrackerDB) -> list[dict[str, Any]]:
@@ -287,6 +405,7 @@ def _candidate_links(db: TrackerDB) -> list[dict[str, Any]]:
         for event in events
         if event.get("source_surface") == "provider_invoice"
         and event.get("money_rail") == "invoice_line"
+        and event.get("cash_superseded_by") is None
     ]
     banks = [
         event
@@ -294,6 +413,7 @@ def _candidate_links(db: TrackerDB) -> list[dict[str, Any]]:
         if event.get("source_surface") == "bank_statement"
         and event.get("money_rail") == "invoice_line"
         and event.get("cash_status") == "posted"
+        and event.get("cash_superseded_by") is None
     ]
     existing = {
         (link["invoice_event_id"], link["settlement_event_id"])
@@ -322,7 +442,18 @@ def _candidate_links(db: TrackerDB) -> list[dict[str, Any]]:
             merchant_score = SequenceMatcher(None, merchant_a, merchant_b).ratio()
             exact_amount = abs(Decimal(str(invoice_amount))) == abs(Decimal(str(bank_amount)))
             if day_gap <= 14 and (
-                (exact_amount and merchant_score >= 0.35) or merchant_score >= 0.62
+                (
+                    exact_amount
+                    and (
+                        not merchant_a
+                        or not merchant_b
+                        or merchant_score >= 0.35
+                    )
+                )
+                or (
+                    bool(merchant_a and merchant_b)
+                    and merchant_score >= 0.62
+                )
             ):
                 candidates.append(
                     _link(
@@ -361,10 +492,13 @@ def import_cash_trail(
 
     # Validate that link files resolve before writing any event rows.
     existing_sources = _source_map(db)
-    event_surfaces = {
-        row["event_id"]: row["source_surface"]
+    event_info = {
+        row["event_id"]: dict(row)
         for row in db.conn.execute(
-            "SELECT event_id, source_surface FROM usage_events WHERE ingest_channel=?",
+            """
+            SELECT event_id, source_surface, currency, amount_native, cash_status
+            FROM usage_events WHERE ingest_channel=?
+            """,
             (CHANNEL,),
         ).fetchall()
     }
@@ -390,13 +524,54 @@ def import_cash_trail(
                     "Invoice and bank source_record_id values must be distinct: "
                     f"{event.cash_source_record_id}"
                 )
-            event_surfaces[event.event_id] = event.source_surface
-    source_ids = {**existing_sources, **source_ids}
+            event_info[event.event_id] = {
+                "source_surface": event.source_surface,
+                "currency": event.currency,
+                "amount_native": event.amount_native,
+                "cash_status": event.cash_status,
+            }
+    incoming_sources = {}
+    events_to_upsert = []
+    for event in events:
+        known_event = db.conn.execute(
+            "SELECT cash_superseded_by FROM usage_events WHERE event_id=?",
+            (event.event_id,),
+        ).fetchone()
+        if known_event and known_event["cash_superseded_by"] is not None:
+            continue
+        incoming_sources[event.cash_source_record_id or ""] = event.event_id
+        events_to_upsert.append(event)
+    source_ids = {**existing_sources, **incoming_sources}
     explicit_links = (
-        _import_links(links_csv, source_ids, event_surfaces) if links_csv else []
+        _import_links(links_csv, source_ids, event_info) if links_csv else []
     )
+    _validate_partial_allocations(db, explicit_links, event_info)
 
-    db.upsert_events(events)
+    for event in events_to_upsert:
+        known_event = db.conn.execute(
+            "SELECT cash_superseded_by FROM usage_events WHERE event_id=?",
+            (event.event_id,),
+        ).fetchone()
+        if known_event:
+            continue
+        db.conn.execute(
+            """
+            UPDATE usage_events
+            SET cash_superseded_by=?
+            WHERE ingest_channel=? AND source_surface=?
+              AND cash_source_record_id=? AND cash_superseded_by IS NULL
+              AND event_id != ?
+            """,
+            (
+                event.event_id,
+                CHANNEL,
+                event.source_surface,
+                event.cash_source_record_id,
+                event.event_id,
+            ),
+        )
+    db.conn.commit()
+    db.upsert_events(events_to_upsert)
     for link in explicit_links:
         db.upsert_cash_link(link)
     candidates = _candidate_links(db)

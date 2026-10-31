@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import sqlite3
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Iterable
 
 from src.models import UsageEvent
+
+_CASH_MATCH_SIGNALS = {"amount", "currency", "date_window", "merchant", "manual"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS usage_events (
@@ -42,7 +45,8 @@ CREATE TABLE IF NOT EXISTS usage_events (
   label TEXT,
   cash_source_record_id TEXT,
   cash_status TEXT,
-  cash_merchant TEXT
+  cash_merchant TEXT,
+  cash_superseded_by TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_session ON usage_events(session_id);
@@ -139,6 +143,7 @@ class TrackerDB:
             ("cash_source_record_id", "TEXT"),
             ("cash_status", "TEXT"),
             ("cash_merchant", "TEXT"),
+            ("cash_superseded_by", "TEXT"),
         ):
             if column not in cols:
                 self.conn.execute(
@@ -177,7 +182,7 @@ class TrackerDB:
                 """
             )
         self.conn.execute(
-            "INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('version', '0.3-cash-trail')"
+            "INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('version', '0.4-cash-trail')"
         )
 
     def close(self) -> None:
@@ -194,7 +199,7 @@ class TrackerDB:
           unit_price_in_per_1m, unit_price_out_per_1m, unit_price_cached_in_per_1m,
           cost_usd, amount_native, currency, pricing_as_of, billing_identity, service_tier,
           evidence_class, ingest_channel, raw_ref, notes, label,
-          cash_source_record_id, cash_status, cash_merchant
+          cash_source_record_id, cash_status, cash_merchant, cash_superseded_by
         ) VALUES (
           :event_id, :source_product, :source_surface, :session_id, :parent_event_id,
           :ts_utc, :model, :grain, :money_rail, :prompt_text_hash,
@@ -203,9 +208,13 @@ class TrackerDB:
           :unit_price_in_per_1m, :unit_price_out_per_1m, :unit_price_cached_in_per_1m,
           :cost_usd, :amount_native, :currency, :pricing_as_of, :billing_identity, :service_tier,
           :evidence_class, :ingest_channel, :raw_ref, :notes, :label,
-          :cash_source_record_id, :cash_status, :cash_merchant
+          :cash_source_record_id, :cash_status, :cash_merchant, :cash_superseded_by
         )
         ON CONFLICT(event_id) DO UPDATE SET
+          source_product=excluded.source_product,
+          source_surface=excluded.source_surface,
+          session_id=excluded.session_id,
+          ts_utc=excluded.ts_utc,
           cost_usd=excluded.cost_usd,
           unit_price_in_per_1m=excluded.unit_price_in_per_1m,
           unit_price_out_per_1m=excluded.unit_price_out_per_1m,
@@ -224,7 +233,9 @@ class TrackerDB:
           currency=excluded.currency,
           cash_source_record_id=excluded.cash_source_record_id,
           cash_status=excluded.cash_status,
-          cash_merchant=excluded.cash_merchant
+          cash_merchant=excluded.cash_merchant,
+          raw_ref=excluded.raw_ref,
+          cash_superseded_by=excluded.cash_superseded_by
         """
         cur = self.conn.cursor()
         for ev in events:
@@ -298,6 +309,13 @@ class TrackerDB:
             raise ValueError(f"Invalid cash link relation: {link['relation']}")
         if link["status"] not in {"candidate", "confirmed", "rejected"}:
             raise ValueError(f"Invalid cash link status: {link['status']}")
+        signals = {
+            signal.strip()
+            for signal in str(link["matched_on"]).split(",")
+            if signal.strip()
+        }
+        if signals - _CASH_MATCH_SIGNALS:
+            raise ValueError("Cash link matched_on contains an unknown signal")
         if link["status"] == "confirmed" and not link["confirmed_by"]:
             raise ValueError("Confirmed cash links require an operator or explicit rule")
         if link["status"] == "confirmed" and link["confirmed_by"] != "operator" and not (
@@ -308,7 +326,7 @@ class TrackerDB:
         surfaces = []
         for event_id in (link["invoice_event_id"], link["settlement_event_id"]):
             exists = self.conn.execute(
-                "SELECT source_surface, money_rail FROM usage_events WHERE event_id=?",
+                "SELECT source_surface, money_rail, currency, amount_native, cash_status FROM usage_events WHERE event_id=?",
                 (event_id,),
             ).fetchone()
             if not exists:
@@ -320,12 +338,88 @@ class TrackerDB:
             surfaces.append(exists["source_surface"])
         if surfaces != ["provider_invoice", "bank_statement"]:
             raise ValueError("Cash links must point from an invoice to a bank-statement row")
+        invoice_row = self.conn.execute(
+            "SELECT currency, amount_native FROM usage_events WHERE event_id=?",
+            (link["invoice_event_id"],),
+        ).fetchone()
+        settlement_row = self.conn.execute(
+            "SELECT currency, amount_native, cash_status FROM usage_events WHERE event_id=?",
+            (link["settlement_event_id"],),
+        ).fetchone()
 
         now = datetime.now(timezone.utc).isoformat()
         current = self.conn.execute(
             "SELECT * FROM cash_cross_references WHERE link_id=?",
             (link["link_id"],),
         ).fetchone()
+        if link["status"] == "confirmed":
+            if link["relation"] == "candidate_match":
+                raise ValueError(
+                    "Confirmed links must declare settles, refunds, or partial_settlement"
+                )
+            if (
+                not invoice_row["currency"]
+                or invoice_row["currency"] != settlement_row["currency"]
+            ):
+                raise ValueError("Confirmed cash links require matching currencies")
+            if settlement_row["cash_status"] != "posted":
+                raise ValueError("Only posted bank rows can be confirmed as settlements")
+            invoice_amount = Decimal(str(invoice_row["amount_native"] or 0))
+            settlement_amount = Decimal(str(settlement_row["amount_native"] or 0))
+            if link["relation"] in {"settles", "refunds"} and abs(
+                invoice_amount
+            ) != abs(settlement_amount):
+                raise ValueError(
+                    "Confirmed full settlement/refund links require equal native amounts"
+                )
+            linked_rows = self.conn.execute(
+                """
+                SELECT invoice_event_id, relation FROM cash_cross_references
+                WHERE settlement_event_id=? AND status='confirmed' AND link_id != ?
+                """,
+                (link["settlement_event_id"], link["link_id"]),
+            ).fetchall()
+            for existing_link in linked_rows:
+                compatible_partials = (
+                    link["relation"] == "partial_settlement"
+                    and existing_link["relation"] == "partial_settlement"
+                    and existing_link["invoice_event_id"] == link["invoice_event_id"]
+                )
+                if not compatible_partials:
+                    raise ValueError(
+                        "A posted bank row cannot be confirmed against multiple cash links"
+                    )
+            if link["relation"] == "partial_settlement":
+                if invoice_amount == 0 or settlement_amount == 0:
+                    raise ValueError("Partial settlements require nonzero native amounts")
+                if invoice_amount * settlement_amount < 0:
+                    raise ValueError(
+                        "Partial settlement and invoice amounts must have matching signs"
+                    )
+                allocated = self.conn.execute(
+                    """
+                    SELECT settlement_event_id FROM cash_cross_references
+                    WHERE invoice_event_id=? AND status='confirmed'
+                      AND relation='partial_settlement' AND link_id != ?
+                    """,
+                    (link["invoice_event_id"], link["link_id"]),
+                ).fetchall()
+                allocated_amount = sum(
+                    (
+                        Decimal(str(
+                            self.conn.execute(
+                                "SELECT amount_native FROM usage_events WHERE event_id=?",
+                                (row["settlement_event_id"],),
+                            ).fetchone()[0] or 0
+                        ))
+                        for row in allocated
+                    ),
+                    Decimal(0),
+                )
+                if abs(allocated_amount + settlement_amount) > abs(invoice_amount):
+                    raise ValueError(
+                        "Confirmed partial settlements cannot exceed the invoice amount"
+                    )
         created_at = current["created_at"] if current else now
         values = {
             **link,

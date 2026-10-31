@@ -149,7 +149,15 @@ PRESERVE_KEYS = {
 }
 
 # IDs: remap consistently, not leave real UUIDs
-ID_KEYS = {"event_id", "session_id", "parent_event_id", "id"}
+ID_KEYS = {
+    "event_id",
+    "session_id",
+    "parent_event_id",
+    "invoice_event_id",
+    "settlement_event_id",
+    "link_id",
+    "id",
+}
 
 # Timestamps: optional shift (default: keep relative shape, shift epoch)
 TS_KEYS = {"ts_utc", "ts", "started_at", "ended_at", "finished_at"}
@@ -351,6 +359,15 @@ def obfuscate_dashboard_payload(
         for g in out["gaps"]:
             if isinstance(g, dict) and g.get("example_event_id"):
                 g["example_event_id"] = om.map_id(str(g["example_event_id"]), kind="event")
+    if "cash_trail" in out and isinstance(out["cash_trail"], dict):
+        cash_trail = obfuscate_obj(out["cash_trail"], om)
+        for link in cash_trail.get("links", []):
+            confirmed_by = link.get("confirmed_by")
+            if isinstance(confirmed_by, str) and confirmed_by.startswith("rule:"):
+                link["confirmed_by"] = "rule:" + om.map_id(
+                    confirmed_by[len("rule:"):], kind="event"
+                )
+        out["cash_trail"] = cash_trail
     return out
 
 

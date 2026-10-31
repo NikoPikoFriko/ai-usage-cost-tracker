@@ -145,7 +145,9 @@ def cmd_reprice(_: argparse.Namespace) -> int:
     def price_fn(row: dict) -> dict:
         rail = row.get("money_rail") or "unknown"
         # subscription / invoice lines keep adapter cost unless null
-        if rail in ("subscription", "invoice_line") and row.get("cost_usd") is not None:
+        if rail in ("subscription", "invoice_line") and (
+            row.get("cost_usd") is not None or row.get("amount_native") is not None
+        ):
             return {
                 "event_id": row["event_id"],
                 "unit_price_in_per_1m": row.get("unit_price_in_per_1m"),

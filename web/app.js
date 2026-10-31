@@ -19,6 +19,10 @@
     return e.ts_utc || e.ts || "";
   }
 
+  function eventIsCurrent(e) {
+    return e.cash_current !== false;
+  }
+
   /** Period window start in ms, or null for All. Client-only on data.json. */
   function periodCutoffMs(period) {
     if (!period || period === "all") return null;
@@ -60,7 +64,7 @@
       '<span class="badge badge-' +
       safe +
       '">' +
-      productLabel(ch) +
+      escapeHtml(productLabel(ch)) +
       "</span>"
     );
   }
@@ -128,8 +132,15 @@
         state.period !== "all"
           ? vis
           : (data.events || []).filter((e) => e.session_id === s.session_id);
-      const priced = use.filter((e) => e.cost_usd != null);
+      const current = use.filter(eventIsCurrent);
+      const priced = current.filter(
+        (e) => e.cost_usd != null && !e.cash_supporting_only
+      );
       const cost = priced.reduce((a, e) => a + e.cost_usd, 0);
+      const native = current.filter(
+        (e) => e.amount_native != null && !e.cash_supporting_only
+      );
+      const currencies = Array.from(new Set(native.map((e) => e.currency).filter(Boolean)));
       return {
         ...s,
         tokens_total: use.reduce(
@@ -137,9 +148,18 @@
           0
         ),
         events_n: use.length,
-        cost_usd: priced.length ? cost : use.length ? null : s.cost_usd,
-        coverage: priced.length + "/" + use.length,
-        grade: use.some((e) => e.grade === "GAP") ? "GAP" : s.grade,
+        cost_usd: priced.length ? cost : current.length ? null : s.cost_usd,
+        amount_native: native.length && currencies.length === 1
+          ? native.reduce((sum, e) => sum + Number(e.amount_native), 0)
+          : null,
+        currency: currencies.length === 1 ? currencies[0] : null,
+        cash_current: current.length > 0,
+        cash_supporting_only: current.length > 0 &&
+          current.every((e) => e.cash_supporting_only),
+        coverage:
+          current.filter((e) => e.cost_usd != null || e.amount_native != null).length +
+          "/" + current.length,
+        grade: current.some((e) => e.grade === "GAP") ? "GAP" : s.grade,
       };
     });
 
@@ -163,11 +183,11 @@
         const checked = state.channel === val ? "checked" : "";
         return (
           '<label class="chip"><input type="radio" name="ch" value="' +
-          val +
+          escapeHtml(val) +
           '" ' +
           checked +
           "/> " +
-          label +
+          escapeHtml(label) +
           "</label>"
         );
       })
@@ -184,7 +204,7 @@
     const host = document.getElementById("rail-strip");
     const byRail = {};
     events.forEach((e) => {
-      if (e.cost_usd == null) return;
+      if (e.cost_usd == null || e.cash_supporting_only || !eventIsCurrent(e)) return;
       const r = e.money_rail || "unknown";
       byRail[r] = (byRail[r] || 0) + e.cost_usd;
     });
@@ -199,14 +219,16 @@
           '<div class="stat"><b>$' +
           byRail[r].toFixed(4) +
           "</b><span>" +
-          r +
+          escapeHtml(r) +
           "</span></div>"
       )
       .join("");
   }
 
   function renderTotals(events, sessions) {
-    const priced = events.filter((e) => e.cost_usd != null);
+    const priced = events.filter(
+      (e) => e.cost_usd != null && !e.cash_supporting_only && eventIsCurrent(e)
+    );
     let cost = priced.reduce((a, e) => a + e.cost_usd, 0);
     if (state.rollup === "metered_only") {
       cost = priced
@@ -216,7 +238,8 @@
     const tin = events.reduce((a, e) => a + (e.tokens_in || 0), 0);
     const tout = events.reduce((a, e) => a + (e.tokens_out || 0), 0);
     const unpriced = events.filter(
-      (e) => e.cost_usd == null && e.amount_native == null
+      (e) => e.cost_usd == null && e.amount_native == null &&
+        !e.cash_supporting_only && eventIsCurrent(e)
     ).length;
     const pct = events.length ? Math.round((100 * unpriced) / events.length) : 0;
     const label =
@@ -274,24 +297,32 @@
     document.getElementById("session-empty").hidden = sessions.length > 0;
     tb.innerHTML = sessions
       .map((s) => {
-        const costCell =
-          s.cost_usd == null
-            ? '<td class="gap-cell">GAP</td>'
-            : "<td>$" + Number(s.cost_usd).toFixed(4) + "</td>";
+          const costCell = s.cash_current === false
+            ? '<td class="muted">Historical</td>'
+            : s.cash_supporting_only
+              ? '<td class="muted">Supporting evidence</td>'
+              : s.cash_multi_currency
+                ? '<td class="muted">Multiple currencies</td>'
+              : s.amount_native != null
+                ? "<td>" + escapeHtml(s.currency || "") + " " +
+                  Number(s.amount_native).toFixed(2) + "</td>"
+                : s.cost_usd == null
+                  ? '<td class="gap-cell">GAP</td>'
+                  : "<td>$" + Number(s.cost_usd).toFixed(4) + "</td>";
         const sel = state.pin === s.session_id ? " is-selected" : "";
         return (
           '<tr class="session-row' +
           sel +
           '" data-session-id="' +
-          s.session_id +
+          escapeHtml(s.session_id) +
           '">' +
           "<td>" +
           badge(s.channel) +
           "</td>" +
           "<td>" +
-          (s.title || "") +
+          escapeHtml(s.title || "") +
           ' <span class="mono muted">' +
-          s.session_id.slice(0, 8) +
+          escapeHtml(s.session_id.slice(0, 8)) +
           "</span></td>" +
           '<td class="hi-only mono">' +
           ((s.started_at || "").replace("T", " ").slice(0, 16) || "—") +
@@ -304,12 +335,12 @@
           "</td>" +
           costCell +
           '<td class="grade-' +
-          s.grade +
+          escapeHtml(s.grade) +
           '">' +
-          s.grade +
+          escapeHtml(s.grade) +
           "</td>" +
           '<td class="hi-only">' +
-          (s.model_mix || []).join(" · ") +
+          escapeHtml((s.model_mix || []).join(" · ")) +
           "</td>" +
           '<td class="hi-only">' +
           (s.coverage || "") +
@@ -340,8 +371,11 @@
     const sorted = events.slice().sort((a, b) => eventTs(b).localeCompare(eventTs(a)));
     tb.innerHTML = sorted
       .map((e) => {
-        const costCell =
-          e.amount_native != null
+        const costCell = e.cash_current === false
+          ? '<td class="muted">Historical (superseded)</td>'
+          : e.cash_supporting_only
+            ? '<td class="muted">Supporting invoice</td>'
+            : e.amount_native != null
             ? "<td>" + escapeHtml(e.currency || "") + " " +
               Number(e.amount_native).toFixed(2) + "</td>"
             : e.cost_usd == null
@@ -350,24 +384,24 @@
         return (
           "<tr>" +
           '<td class="mono">' +
-          (eventTs(e).replace("T", " ").slice(0, 19) || "—") +
+          escapeHtml(eventTs(e).replace("T", " ").slice(0, 19) || "—") +
           "</td>" +
           "<td>" +
           badge(e.channel) +
           "</td>" +
           '<td class="unpin-only">' +
-          (state.pin ? "" : sessionTitle(e.session_id)) +
+          (state.pin ? "" : escapeHtml(sessionTitle(e.session_id))) +
           "</td>" +
           "<td>" +
-          (e.label || "") +
+          escapeHtml(e.label || "") +
           ' <span class="muted mono">' +
-          (e.money_rail || "") +
+          escapeHtml(e.money_rail || "") +
           "</span></td>" +
           '<td class="hi-only">' +
-          (e.role || "") +
+          escapeHtml(e.role || "") +
           "</td>" +
           '<td class="mono">' +
-          (e.model || "") +
+          escapeHtml(e.model || "") +
           "</td>" +
           "<td>" +
           fmtInt(e.tokens_in) +
@@ -380,9 +414,9 @@
           "</td>" +
           costCell +
           '<td class="grade-' +
-          e.grade +
+          escapeHtml(e.grade) +
           '">' +
-          e.grade +
+          escapeHtml(e.grade) +
           "</td>" +
           "</tr>"
         );
@@ -396,7 +430,8 @@
 
   function renderGaps(events) {
     const unpriced = events.filter(
-      (e) => e.cost_usd == null && e.amount_native == null
+      (e) => e.cost_usd == null && e.amount_native == null &&
+        !e.cash_supporting_only && eventIsCurrent(e)
     );
     const ul = document.getElementById("gap-list");
     const ok = document.getElementById("gaps-ok");
@@ -418,7 +453,7 @@
       '<li><strong class="gap-cell">G-NO-PRICE</strong> × ' +
       unpriced.length +
       " — " +
-      action +
+      escapeHtml(action) +
       "</li>";
     serial.textContent = "One next step: " + action;
   }
@@ -433,9 +468,90 @@
     })[char]);
   }
 
-  function renderCashTrail() {
-    const trail = data.cash_trail || {};
-    const ranges = trail.ranges || [];
+  function filteredCashTrail(events) {
+    const activeEvents = events.filter((event) =>
+      eventIsCurrent(event) &&
+      ["provider_invoice", "bank_statement"].includes(event.cash_source_surface)
+    );
+    const byId = new Map(activeEvents.map((event) => [event.event_id, event]));
+    const links = ((data.cash_trail && data.cash_trail.links) || []).filter(
+      (link) => byId.has(link.invoice_event_id) && byId.has(link.settlement_event_id)
+    );
+    const confirmedInvoices = new Set(
+      links.filter((link) =>
+        link.status === "confirmed" &&
+        ["settles", "refunds", "partial_settlement"].includes(link.relation) &&
+        byId.get(link.settlement_event_id).cash_status === "posted"
+      ).map((link) => link.invoice_event_id)
+    );
+    const totals = new Map();
+    const getTotal = (currency) => {
+      if (!totals.has(currency)) {
+        totals.set(currency, {
+          lower: 0, upper: 0, pending: 0,
+          unresolved_invoices: 0, partial_remainders: 0,
+        });
+      }
+      return totals.get(currency);
+    };
+    let pendingCount = 0;
+    activeEvents.forEach((event) => {
+      const currency = (event.currency || (event.cost_usd != null ? "USD" : "UNK")).toUpperCase();
+      const amount = Number(event.amount_native == null ? event.cost_usd || 0 : event.amount_native);
+      const row = getTotal(currency);
+      if (event.cash_source_surface === "bank_statement") {
+        if (event.cash_status === "pending") {
+          row.pending += amount;
+          pendingCount += 1;
+        } else {
+          row.lower += amount;
+          row.upper += amount;
+        }
+      } else if (!confirmedInvoices.has(event.event_id)) {
+        if (amount >= 0) row.upper += amount;
+        else row.lower += amount;
+        row.unresolved_invoices += 1;
+      }
+    });
+    const partials = new Map();
+    links.forEach((link) => {
+      if (link.status !== "confirmed" || link.relation !== "partial_settlement") return;
+      if (!partials.has(link.invoice_event_id)) partials.set(link.invoice_event_id, []);
+      partials.get(link.invoice_event_id).push(byId.get(link.settlement_event_id));
+    });
+    partials.forEach((settlements, invoiceId) => {
+      const invoice = byId.get(invoiceId);
+      const currency = (invoice.currency || "UNK").toUpperCase();
+      const invoiceAmount = Number(invoice.amount_native || invoice.cost_usd || 0);
+      const settled = settlements.reduce(
+        (sum, settlement) => sum + Number(settlement.amount_native || settlement.cost_usd || 0),
+        0
+      );
+      const remainder = invoiceAmount - settled;
+      if (Math.abs(remainder) < 0.000001) return;
+      const row = getTotal(currency);
+      if (remainder >= 0) row.upper += remainder;
+      else row.lower += remainder;
+      row.partial_remainders += 1;
+    });
+    return {
+      ranges: Array.from(totals.entries()).sort(([a], [b]) => a.localeCompare(b))
+        .map(([currency, values]) => ({
+          currency,
+          lower: Number(values.lower.toFixed(6)),
+          upper: Number(values.upper.toFixed(6)),
+          pending: Number(values.pending.toFixed(6)),
+          unresolved_invoices: values.unresolved_invoices,
+          partial_remainders: values.partial_remainders,
+        })),
+      links,
+      pending_count: pendingCount,
+    };
+  }
+
+  function renderCashTrail(events) {
+    const trail = filteredCashTrail(events);
+    const ranges = trail.ranges;
     const rangeHost = document.getElementById("cash-range-list");
     rangeHost.innerHTML = ranges.map((r) =>
       '<div class="cash-range"><b>' + escapeHtml(r.currency) + " " +
@@ -449,8 +565,8 @@
         " partial settlement remainder(s)</span>" : "") + "</div>"
     ).join("");
     document.getElementById("cash-range-note").textContent = ranges.length
-      ? "Confirmed full settlements count the posted bank row once; unresolved invoices widen the range. No currency conversion is applied."
-      : (trail.pending_count ? trail.pending_count + " pending authorization(s); no posted cash evidence yet." : "No local invoice or bank evidence imported.");
+      ? "Currently visible cash evidence only. Confirmed full settlements count the posted bank row once; unresolved invoices widen the range. No currency conversion is applied."
+      : (trail.pending_count ? trail.pending_count + " pending authorization(s); no posted cash evidence yet in the visible scope." : "No invoice or bank evidence in the visible scope.");
     const links = trail.links || [];
     document.getElementById("cash-link-tbody").innerHTML = links.map((link) =>
       "<tr><td>" + escapeHtml(link.status) + "</td><td>" +
@@ -468,7 +584,7 @@
     renderSessions(sessions);
     renderEvents(events);
     renderGaps(events);
-    renderCashTrail();
+    renderCashTrail(events);
     const bits = [
       (data.meta && data.meta.data_class) || "DATA",
       "rollup:" + state.rollup,

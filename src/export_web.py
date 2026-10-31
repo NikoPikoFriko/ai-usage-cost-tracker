@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -34,15 +35,19 @@ def _cash_trail_payload(
         for event in events
         if event.get("money_rail") == "invoice_line"
         and event.get("source_surface") in {"provider_invoice", "bank_statement"}
+        and event.get("cash_superseded_by") is None
     ]
     by_id = {event["event_id"]: event for event in cash_events}
     confirmed_invoice_ids = set()
     for link in links:
         settlement = by_id.get(link["settlement_event_id"])
+        invoice = by_id.get(link["invoice_event_id"])
         if (
             link["status"] == "confirmed"
             and link["relation"] in {"settles", "refunds", "partial_settlement"}
             and settlement
+            and invoice
+            and invoice.get("cash_superseded_by") is None
             and settlement.get("cash_status") == "posted"
         ):
             confirmed_invoice_ids.add(link["invoice_event_id"])
@@ -60,33 +65,38 @@ def _cash_trail_payload(
     pending_count = 0
     for event in cash_events:
         currency = (event.get("currency") or ("USD" if event.get("cost_usd") is not None else "UNK")).upper()
-        amount = event.get("amount_native")
-        if amount is None:
-            amount = event.get("cost_usd")
-        amount = float(amount or 0)
+        amount_value = event.get("amount_native")
+        if amount_value is None:
+            amount_value = event.get("cost_usd")
+        amount = Decimal(str(amount_value or 0))
         bucket = totals[currency]
         if event.get("source_surface") == "bank_statement":
             if event.get("cash_status") == "pending":
                 pending_count += 1
-                bucket["pending"] += amount
+                bucket["pending"] += float(amount)
             else:
-                bucket["lower"] += amount
-                bucket["upper"] += amount
+                bucket["lower"] += float(amount)
+                bucket["upper"] += float(amount)
         elif event["event_id"] not in confirmed_invoice_ids:
-            bucket["upper" if amount >= 0 else "lower"] += amount
+            bucket["upper" if amount >= 0 else "lower"] += float(amount)
             bucket["unresolved_invoices"] += 1
             unresolved.append(
                 {
                     "event_id": event["event_id"],
                     "currency": currency,
-                    "amount_native": amount,
+                    "amount_native": float(amount),
                     "date": event["ts_utc"][:10],
                 }
             )
 
     partial_settlements: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for link in links:
-        if link["status"] == "confirmed" and link["relation"] == "partial_settlement":
+        if (
+            link["status"] == "confirmed"
+            and link["relation"] == "partial_settlement"
+            and link["invoice_event_id"] in by_id
+            and link["settlement_event_id"] in by_id
+        ):
             partial_settlements[link["invoice_event_id"]].append(link)
     for invoice_id, invoice_links in partial_settlements.items():
         invoice = by_id.get(invoice_id)
@@ -103,16 +113,22 @@ def _cash_trail_payload(
         if not posted_settlements:
             continue
         currency = (invoice.get("currency") or "UNK").upper()
-        invoice_amount = float(invoice.get("amount_native") or invoice.get("cost_usd") or 0)
+        invoice_amount = Decimal(
+            str(invoice.get("amount_native") or invoice.get("cost_usd") or 0)
+        )
         settlement_amount = sum(
-            float(row.get("amount_native") or row.get("cost_usd") or 0)
-            for row in posted_settlements
+            (
+                Decimal(str(row.get("amount_native") or row.get("cost_usd") or 0))
+                for row in posted_settlements
+            ),
+            Decimal(0),
         )
         bucket = totals[currency]
         remainder = invoice_amount - settlement_amount
         if remainder:
-            bucket["upper" if remainder >= 0 else "lower"] += remainder
-            bucket["partial_remainders"] += 1
+            if abs(remainder) >= Decimal("0.000001"):
+                bucket["upper" if remainder >= 0 else "lower"] += float(remainder)
+                bucket["partial_remainders"] += 1
 
     ranges = [
         {
@@ -149,6 +165,17 @@ def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
     events_raw = db.fetch_all_events()
     meta_map = db.fetch_session_meta()
     cash_trail = _cash_trail_payload(events_raw, db.fetch_cash_links())
+    supporting_event_ids = {
+        link["invoice_event_id"]
+        for link in cash_trail["links"]
+        if link["status"] == "confirmed"
+        and link["relation"] in {"settles", "refunds", "partial_settlement"}
+        and link["invoice_event_id"] in {
+            event["event_id"]
+            for event in events_raw
+            if event.get("cash_superseded_by") is None
+        }
+    }
 
     events_out = []
     by_session: dict[str, list[dict]] = defaultdict(list)
@@ -178,15 +205,26 @@ def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
             "amount_native": e.get("amount_native"),
             "currency": e.get("currency"),
             "cash_status": e.get("cash_status"),
+            "cash_supporting_only": e["event_id"] in supporting_event_ids,
+            "cash_source_surface": e.get("source_surface"),
+            "cash_current": e.get("cash_superseded_by") is None,
             "grade": e.get("evidence_class") or "CAND",
-            "gap_code": "G-NO-PRICE" if e.get("cost_usd") is None else None,
+            "gap_code": (
+                "G-NO-PRICE"
+                if e.get("cost_usd") is None and e.get("amount_native") is None
+                else None
+            ),
             "ingest_channel": e.get("ingest_channel"),
             "billing_identity": e.get("billing_identity"),
             "service_tier": e.get("service_tier"),
         }
         events_out.append(row)
         by_session[e["session_id"]].append(row)
-        if row["cost_usd"] is not None:
+        if (
+            row["cost_usd"] is not None
+            and not row["cash_supporting_only"]
+            and row["cash_current"]
+        ):
             by_rail[rail] += float(row["cost_usd"])
             by_product[product] += float(row["cost_usd"])
 
@@ -196,8 +234,26 @@ def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
         tin = sum(x["tokens_in"] for x in evs)
         tout = sum(x["tokens_out"] for x in evs)
         tcached = sum(x["tokens_cached"] for x in evs)
-        priced = [x for x in evs if x["cost_usd"] is not None]
+        priced = [
+            x for x in evs
+            if x["cost_usd"] is not None
+            and not x["cash_supporting_only"]
+            and x["cash_current"]
+        ]
         cost = sum(x["cost_usd"] for x in priced) if priced else None
+        native_cash = [
+            x for x in evs
+            if x["amount_native"] is not None
+            and x["currency"]
+            and not x["cash_supporting_only"]
+            and x["cash_current"]
+        ]
+        native_currencies = {x["currency"] for x in native_cash}
+        native_amount = (
+            round(sum(float(x["amount_native"]) for x in native_cash), 6)
+            if len(native_currencies) == 1
+            else None
+        )
         models = sorted({x["model"] for x in evs if x.get("model")})
         grades = [x["grade"] for x in evs]
         rails = sorted({x.get("money_rail") or "unknown" for x in evs})
@@ -218,9 +274,16 @@ def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
                 "tokens_out": tout,
                 "tokens_cached": tcached,
                 "cost_usd": None if cost is None else round(cost, 6),
+                "amount_native": native_amount,
+                "currency": next(iter(native_currencies)) if len(native_currencies) == 1 else None,
+                "cash_multi_currency": len(native_currencies) > 1,
+                "cash_supporting_only": bool(evs) and all(
+                    x["cash_supporting_only"] for x in evs
+                ),
+                "cash_current": any(x["cash_current"] for x in evs),
                 "model_mix": models,
                 "grade": _worst_grade(grades),
-                "coverage": f"{len(priced)}/{len(evs)}",
+                "coverage": f"{sum(x['cash_current'] and (x['cost_usd'] is not None or x['amount_native'] is not None) for x in evs)}/{len(evs)}",
                 "money_rails": rails,
             }
         )
@@ -229,10 +292,18 @@ def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
         key=lambda s: (s["cost_usd"] is None, -(s["cost_usd"] or 0), s.get("started_at") or ""),
     )
 
-    all_priced = [e for e in events_out if e["cost_usd"] is not None]
+    all_priced = [
+        e for e in events_out
+        if e["cost_usd"] is not None
+        and not e["cash_supporting_only"]
+        and e["cash_current"]
+    ]
     unpriced = [
         e for e in events_out
-        if e["cost_usd"] is None and e["amount_native"] is None
+        if e["cost_usd"] is None
+        and e["amount_native"] is None
+        and not e["cash_supporting_only"]
+        and e["cash_current"]
     ]
     metered = [e for e in all_priced if e.get("money_rail") == "api_metered"]
     credits = [e for e in all_priced if e.get("money_rail") == "credits"]
