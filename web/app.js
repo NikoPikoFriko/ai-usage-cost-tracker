@@ -70,7 +70,7 @@
     if (!eventInPeriod(e)) return false;
     if (state.rollup === "metered_only" && e.money_rail !== "api_metered") return false;
     if (state.gapOnly && e.grade !== "GAP") return false;
-    if (state.unpricedOnly && e.cost_usd != null) return false;
+    if (state.unpricedOnly && (e.cost_usd != null || e.amount_native != null)) return false;
     if (state.pin && e.session_id !== state.pin) return false;
     if (state.q) {
       const hay = [
@@ -215,7 +215,9 @@
     }
     const tin = events.reduce((a, e) => a + (e.tokens_in || 0), 0);
     const tout = events.reduce((a, e) => a + (e.tokens_out || 0), 0);
-    const unpriced = events.filter((e) => e.cost_usd == null).length;
+    const unpriced = events.filter(
+      (e) => e.cost_usd == null && e.amount_native == null
+    ).length;
     const pct = events.length ? Math.round((100 * unpriced) / events.length) : 0;
     const label =
       state.rollup === "all_labeled"
@@ -339,9 +341,12 @@
     tb.innerHTML = sorted
       .map((e) => {
         const costCell =
-          e.cost_usd == null
-            ? '<td class="gap-cell">GAP</td>'
-            : "<td>$" + Number(e.cost_usd).toFixed(4) + "</td>";
+          e.amount_native != null
+            ? "<td>" + escapeHtml(e.currency || "") + " " +
+              Number(e.amount_native).toFixed(2) + "</td>"
+            : e.cost_usd == null
+              ? '<td class="gap-cell">GAP</td>'
+              : "<td>$" + Number(e.cost_usd).toFixed(4) + "</td>";
         return (
           "<tr>" +
           '<td class="mono">' +
@@ -390,7 +395,9 @@
   }
 
   function renderGaps(events) {
-    const unpriced = events.filter((e) => e.cost_usd == null);
+    const unpriced = events.filter(
+      (e) => e.cost_usd == null && e.amount_native == null
+    );
     const ul = document.getElementById("gap-list");
     const ok = document.getElementById("gaps-ok");
     const serial = document.getElementById("gap-serial-action");
@@ -416,6 +423,44 @@
     serial.textContent = "One next step: " + action;
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[char]);
+  }
+
+  function renderCashTrail() {
+    const trail = data.cash_trail || {};
+    const ranges = trail.ranges || [];
+    const rangeHost = document.getElementById("cash-range-list");
+    rangeHost.innerHTML = ranges.map((r) =>
+      '<div class="cash-range"><b>' + escapeHtml(r.currency) + " " +
+      Number(r.lower).toFixed(2) + " – " + Number(r.upper).toFixed(2) +
+      '</b><span>posted lower bound – invoice-inclusive upper bound</span>' +
+      (r.pending ? '<span>Pending: ' + Number(r.pending).toFixed(2) + " " +
+        escapeHtml(r.currency) + " (excluded)</span>" : "") +
+      (r.unresolved_invoices ? '<span>' + r.unresolved_invoices +
+        " unresolved invoice(s)</span>" : "") +
+      (r.partial_remainders ? '<span>' + r.partial_remainders +
+        " partial settlement remainder(s)</span>" : "") + "</div>"
+    ).join("");
+    document.getElementById("cash-range-note").textContent = ranges.length
+      ? "Confirmed full settlements count the posted bank row once; unresolved invoices widen the range. No currency conversion is applied."
+      : (trail.pending_count ? trail.pending_count + " pending authorization(s); no posted cash evidence yet." : "No local invoice or bank evidence imported.");
+    const links = trail.links || [];
+    document.getElementById("cash-link-tbody").innerHTML = links.map((link) =>
+      "<tr><td>" + escapeHtml(link.status) + "</td><td>" +
+      escapeHtml(link.relation) + "</td><td>" +
+      (link.confidence == null ? "—" : Number(link.confidence).toFixed(2)) +
+      "</td></tr>"
+    ).join("");
+    document.getElementById("cash-link-empty").hidden = links.length > 0;
+  }
+
   function render() {
     const events = filteredEvents();
     const sessions = filteredSessions();
@@ -423,6 +468,7 @@
     renderSessions(sessions);
     renderEvents(events);
     renderGaps(events);
+    renderCashTrail();
     const bits = [
       (data.meta && data.meta.data_class) || "DATA",
       "rollup:" + state.rollup,
@@ -451,6 +497,9 @@
       "tokens_out",
       "tokens_cached",
       "cost_usd",
+      "amount_native",
+      "currency",
+      "cash_status",
       "grade",
       "billing_identity",
     ];
@@ -475,6 +524,9 @@
           e.tokens_out != null ? e.tokens_out : "",
           e.tokens_cached != null ? e.tokens_cached : "",
           e.cost_usd != null ? e.cost_usd : "",
+          e.amount_native != null ? e.amount_native : "",
+          e.currency || "",
+          e.cash_status || "",
           e.grade || "",
           e.billing_identity || "",
         ]

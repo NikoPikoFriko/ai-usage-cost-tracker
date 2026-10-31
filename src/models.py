@@ -34,12 +34,17 @@ class UsageEvent:
     unit_price_out_per_1m: Optional[float] = None
     unit_price_cached_in_per_1m: Optional[float] = None
     cost_usd: Optional[float] = None
+    amount_native: Optional[float] = None
+    currency: Optional[str] = None
     pricing_as_of: Optional[str] = None
     billing_identity: Optional[str] = None
     service_tier: Optional[str] = None
     raw_ref: Optional[str] = None
     notes: Optional[str] = None
     label: Optional[str] = None
+    cash_source_record_id: Optional[str] = None
+    cash_status: Optional[str] = None
+    cash_merchant: Optional[str] = None
 
     def to_row(self) -> dict[str, Any]:
         return asdict(self)

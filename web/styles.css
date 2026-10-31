@@ -141,3 +141,12 @@ footer {
   color: var(--muted);
   font-size: .8rem;
 }
+.cash-range-list { display:flex; flex-wrap:wrap; gap:.65rem; padding:.75rem 1rem 0; }
+.cash-range {
+  display:flex; flex-direction:column; gap:.2rem; min-width:12rem;
+  padding:.65rem .8rem; border:1px solid var(--border); border-radius:10px;
+  background:var(--card2);
+}
+.cash-range b { color:var(--accent); }
+.cash-range span, .cash-note { color:var(--muted); font-size:.8rem; }
+.cash-note { margin:.6rem 1rem .75rem; }

@@ -1,0 +1,3 @@
+source_record_id,source_product,invoice_date,amount_usd,currency,merchant,description
+inv_demo_001,synthetic_ai,2026-07-31,19.37,USD,Example AI Labs,Demo monthly seat
+inv_demo_002,fictional_llm,2026-08-05,31.41,USD,Fictional LLM Works,Demo usage invoice

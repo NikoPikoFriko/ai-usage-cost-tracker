@@ -26,9 +26,129 @@ def _role_for(product: str) -> str:
     return "assistant"
 
 
+def _cash_trail_payload(
+    events: list[dict[str, Any]], links: list[dict[str, Any]]
+) -> dict[str, Any]:
+    cash_events = [
+        event
+        for event in events
+        if event.get("money_rail") == "invoice_line"
+        and event.get("source_surface") in {"provider_invoice", "bank_statement"}
+    ]
+    by_id = {event["event_id"]: event for event in cash_events}
+    confirmed_invoice_ids = set()
+    for link in links:
+        settlement = by_id.get(link["settlement_event_id"])
+        if (
+            link["status"] == "confirmed"
+            and link["relation"] in {"settles", "refunds", "partial_settlement"}
+            and settlement
+            and settlement.get("cash_status") == "posted"
+        ):
+            confirmed_invoice_ids.add(link["invoice_event_id"])
+
+    totals: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {
+            "lower": 0.0,
+            "upper": 0.0,
+            "pending": 0.0,
+            "unresolved_invoices": 0,
+            "partial_remainders": 0,
+        }
+    )
+    unresolved = []
+    pending_count = 0
+    for event in cash_events:
+        currency = (event.get("currency") or ("USD" if event.get("cost_usd") is not None else "UNK")).upper()
+        amount = event.get("amount_native")
+        if amount is None:
+            amount = event.get("cost_usd")
+        amount = float(amount or 0)
+        bucket = totals[currency]
+        if event.get("source_surface") == "bank_statement":
+            if event.get("cash_status") == "pending":
+                pending_count += 1
+                bucket["pending"] += amount
+            else:
+                bucket["lower"] += amount
+                bucket["upper"] += amount
+        elif event["event_id"] not in confirmed_invoice_ids:
+            bucket["upper" if amount >= 0 else "lower"] += amount
+            bucket["unresolved_invoices"] += 1
+            unresolved.append(
+                {
+                    "event_id": event["event_id"],
+                    "currency": currency,
+                    "amount_native": amount,
+                    "date": event["ts_utc"][:10],
+                }
+            )
+
+    partial_settlements: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for link in links:
+        if link["status"] == "confirmed" and link["relation"] == "partial_settlement":
+            partial_settlements[link["invoice_event_id"]].append(link)
+    for invoice_id, invoice_links in partial_settlements.items():
+        invoice = by_id.get(invoice_id)
+        if not invoice:
+            continue
+        posted_settlements = [
+            by_id.get(link["settlement_event_id"])
+            for link in invoice_links
+        ]
+        posted_settlements = [
+            row for row in posted_settlements
+            if row and row.get("cash_status") == "posted"
+        ]
+        if not posted_settlements:
+            continue
+        currency = (invoice.get("currency") or "UNK").upper()
+        invoice_amount = float(invoice.get("amount_native") or invoice.get("cost_usd") or 0)
+        settlement_amount = sum(
+            float(row.get("amount_native") or row.get("cost_usd") or 0)
+            for row in posted_settlements
+        )
+        bucket = totals[currency]
+        remainder = invoice_amount - settlement_amount
+        if remainder:
+            bucket["upper" if remainder >= 0 else "lower"] += remainder
+            bucket["partial_remainders"] += 1
+
+    ranges = [
+        {
+            "currency": currency,
+            "lower": round(values["lower"], 6),
+            "upper": round(values["upper"], 6),
+            "pending": round(values["pending"], 6),
+            "unresolved_invoices": values["unresolved_invoices"],
+            "partial_remainders": values["partial_remainders"],
+        }
+        for currency, values in sorted(totals.items())
+    ]
+    return {
+        "ranges": ranges,
+        "links": [
+            {
+                "link_id": link["link_id"],
+                "invoice_event_id": link["invoice_event_id"],
+                "settlement_event_id": link["settlement_event_id"],
+                "relation": link["relation"],
+                "status": link["status"],
+                "confidence": link["confidence"],
+                "matched_on": link["matched_on"],
+                "confirmed_by": link["confirmed_by"],
+            }
+            for link in links
+        ],
+        "unresolved_invoices": unresolved,
+        "pending_count": pending_count,
+    }
+
+
 def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
     events_raw = db.fetch_all_events()
     meta_map = db.fetch_session_meta()
+    cash_trail = _cash_trail_payload(events_raw, db.fetch_cash_links())
 
     events_out = []
     by_session: dict[str, list[dict]] = defaultdict(list)
@@ -55,6 +175,9 @@ def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
             "tokens_out": e["output_tokens"] if e["output_tokens"] is not None else 0,
             "tokens_cached": e.get("cached_input_tokens") or 0,
             "cost_usd": e.get("cost_usd"),
+            "amount_native": e.get("amount_native"),
+            "currency": e.get("currency"),
+            "cash_status": e.get("cash_status"),
             "grade": e.get("evidence_class") or "CAND",
             "gap_code": "G-NO-PRICE" if e.get("cost_usd") is None else None,
             "ingest_channel": e.get("ingest_channel"),
@@ -107,7 +230,10 @@ def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
     )
 
     all_priced = [e for e in events_out if e["cost_usd"] is not None]
-    unpriced = [e for e in events_out if e["cost_usd"] is None]
+    unpriced = [
+        e for e in events_out
+        if e["cost_usd"] is None and e["amount_native"] is None
+    ]
     metered = [e for e in all_priced if e.get("money_rail") == "api_metered"]
     credits = [e for e in all_priced if e.get("money_rail") == "credits"]
 
@@ -124,6 +250,10 @@ def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
         "sessions_n": len(sessions_out),
         "events_n": len(events_out),
         "events_priced_n": len(all_priced),
+        "cash_native_events_n": sum(
+            e["amount_native"] is not None and e["currency"] != "USD"
+            for e in events_out
+        ),
         "providers": sorted(products),
     }
 
@@ -151,6 +281,7 @@ def build_dashboard_payload(db: TrackerDB) -> dict[str, Any]:
             "note": "N-way ledger: do not treat mixed rails as one invoice. credits ≈ rate-card estimate for plan burn.",
         },
         "totals": totals,
+        "cash_trail": cash_trail,
         "sessions": sessions_out,
         "events": events_out,
         "gaps": gaps,
