@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.adapters.registry import list_adapters, run_adapter
+from src.cash_trail import import_cash_trail
 from src.cost import load_pricing, price_event_fields
 from src.db import TrackerDB
 from src.export_web import write_web_data
@@ -102,6 +103,41 @@ def cmd_ingest_gemini(args: argparse.Namespace) -> int:
     return _persist_result("gemini_manual", result, args.export)
 
 
+def cmd_ingest_cash_trail(args: argparse.Namespace) -> int:
+    db = TrackerDB(DB_PATH)
+    started_at = _now()
+    try:
+        before = db.count_events()
+        stats = import_cash_trail(
+            db,
+            invoice_csv=Path(args.invoices) if args.invoices else None,
+            bank_csv=Path(args.bank) if args.bank else None,
+            links_csv=Path(args.links) if args.links else None,
+        )
+        after = db.count_events()
+        db.record_ingest_run(
+            channel="cash-trail-manual",
+            started_at=started_at,
+            finished_at=_now(),
+            files_seen=sum(bool(value) for value in (args.invoices, args.bank, args.links)),
+            events_upserted=stats["invoices"] + stats["bank_rows"],
+            events_skipped=0,
+            notes=json.dumps({"stats": stats, "before": before, "after": after}),
+        )
+    finally:
+        db.close()
+    print(json.dumps(stats, indent=2))
+    print(f"db_events_total: {after}")
+    print(f"db: {DB_PATH}")
+    if args.export:
+        payload = write_web_data(DB_PATH, WEB_DATA)
+        print(
+            f"web data: {WEB_DATA} ({payload['meta']['data_class']}, "
+            f"{payload['totals']['events_n']} events)"
+        )
+    return 0
+
+
 def cmd_reprice(_: argparse.Namespace) -> int:
     rates = load_pricing(PRICING)
     db = TrackerDB(DB_PATH)
@@ -109,7 +145,9 @@ def cmd_reprice(_: argparse.Namespace) -> int:
     def price_fn(row: dict) -> dict:
         rail = row.get("money_rail") or "unknown"
         # subscription / invoice lines keep adapter cost unless null
-        if rail in ("subscription", "invoice_line") and row.get("cost_usd") is not None:
+        if rail in ("subscription", "invoice_line") and (
+            row.get("cost_usd") is not None or row.get("amount_native") is not None
+        ):
             return {
                 "event_id": row["event_id"],
                 "unit_price_in_per_1m": row.get("unit_price_in_per_1m"),
@@ -277,6 +315,17 @@ def main(argv: list[str] | None = None) -> int:
     ge.add_argument("--export", action="store_true", default=True)
     ge.add_argument("--no-export", action="store_false", dest="export")
     ge.set_defaults(func=cmd_ingest_gemini)
+
+    cash = ing_sub.add_parser(
+        "cash-trail",
+        help="Import local invoice, bank-statement, and cross-reference CSVs",
+    )
+    cash.add_argument("--invoices", default=None, help="Local invoice CSV path")
+    cash.add_argument("--bank", default=None, help="Local bank CSV path")
+    cash.add_argument("--links", default=None, help="Local operator link CSV path")
+    cash.add_argument("--export", action="store_true", default=True)
+    cash.add_argument("--no-export", action="store_false", dest="export")
+    cash.set_defaults(func=cmd_ingest_cash_trail)
 
     r = sub.add_parser("reprice", help="Recompute costs from pricing CSV")
     r.set_defaults(func=cmd_reprice)

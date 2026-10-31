@@ -143,3 +143,32 @@ def test_same_salt_same_ids():
     b, _ = obfuscate_events(ev, salt="fixed")
     assert a[0]["event_id"] == b[0]["event_id"]
     assert a[0]["label"] == b[0]["label"]
+
+
+def test_cash_trail_ids_and_rule_references_are_obfuscated_consistently():
+    payload = _sample_payload()
+    payload["cash_trail"] = {
+        "ranges": [{"currency": "USD", "lower": 1.0, "upper": 2.0}],
+        "links": [
+            {
+                "link_id": "real-link-secret",
+                "invoice_event_id": "deadbeefcafebabe01",
+                "settlement_event_id": "deadbeefcafebabe02",
+                "relation": "settles",
+                "status": "confirmed",
+                "confirmed_by": "rule:private-rule-42",
+                "matched_on": "amount,currency",
+            }
+        ],
+        "unresolved_invoices": [
+            {"event_id": "deadbeefcafebabe02", "amount_native": 2.0}
+        ],
+    }
+
+    out = obfuscate_dashboard_payload(payload, salt="cash-salt")
+    link = out["cash_trail"]["links"][0]
+    assert link["link_id"] != "real-link-secret"
+    assert link["invoice_event_id"] == out["events"][0]["event_id"]
+    assert link["settlement_event_id"] == out["events"][1]["event_id"]
+    assert link["confirmed_by"] != "rule:private-rule-42"
+    assert out["cash_trail"]["unresolved_invoices"][0]["event_id"] == out["events"][1]["event_id"]

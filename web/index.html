@@ -68,7 +68,7 @@
             <th class="hi-only">Start</th>
             <th>#</th>
             <th>Tok</th>
-            <th>$</th>
+            <th>Amount</th>
             <th>Src</th>
             <th class="hi-only">Models</th>
             <th class="hi-only">Cov</th>
@@ -111,6 +111,23 @@
       </table>
     </div>
     <p class="empty-state" id="event-empty" hidden>0 events match.</p>
+  </section>
+
+  <section class="panel" id="panel-cash-trail">
+    <header class="ph">
+      <h2>Cash evidence</h2>
+      <span class="tag">invoice ↔ bank</span>
+      <span class="muted">Native-currency range; pending authorizations are excluded.</span>
+    </header>
+    <div id="cash-range-list" class="cash-range-list"></div>
+    <p id="cash-range-note" class="muted cash-note"></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Link state</th><th>Relationship</th><th>Confidence</th></tr></thead>
+        <tbody id="cash-link-tbody"></tbody>
+      </table>
+    </div>
+    <p class="empty-state" id="cash-link-empty">No invoice/bank links imported.</p>
   </section>
 
   <section class="panel" id="panel-gaps">
